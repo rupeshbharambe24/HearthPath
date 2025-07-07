@@ -3,14 +3,17 @@ import React from 'react';
 import AppLayout from '@/components/AppLayout';
 import Sidebar from '@/components/Sidebar';
 import DashboardStats from '@/components/DashboardStats';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Dashboard = () => {
-  // Mock user data
+  const { user } = useAuth();
+
+  // Use user data or fallback to mock data
   const userStats = {
-    currentLevel: 3,
-    trustScore: 75,
-    heartsGiven: 24,
-    heartsReceived: 18,
+    currentLevel: user?.relationshipLevel || 3,
+    trustScore: user?.trustScore || 75,
+    heartsGiven: user?.heartsGiven || 24,
+    heartsReceived: user?.heartsReceived || 18,
     totalMatches: 12,
     recentMatches: [
       { id: '1', name: 'Emma Wilson', college: 'Stanford University', level: 4 },
@@ -27,10 +30,10 @@ const Dashboard = () => {
           <div className="max-w-7xl mx-auto">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                Dashboard
+                Welcome back, {user?.name || 'User'}!
               </h1>
               <p className="text-gray-600 dark:text-gray-400">
-                Welcome back! Here's your romantic journey overview.
+                Here's your romantic journey overview.
               </p>
             </div>
             
