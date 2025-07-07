@@ -47,6 +47,16 @@ const App = () => (
                   <Settings />
                 </ProtectedRoute>
               } />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <MyProfile />
+                </ProtectedRoute>
+              } />
+              <Route path="/interactive" element={
+                <ProtectedRoute>
+                  <Interactive />
+                </ProtectedRoute>
+              } />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <MobileNav />

@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Compass, MessageSquare, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Compass, MessageSquare, Settings, LogOut, User, Gamepad2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -14,6 +13,8 @@ const Sidebar = () => {
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Explore', path: '/explore', icon: Compass },
     { name: 'Chat', path: '/chat', icon: MessageSquare },
+    { name: 'My Profile', path: '/profile', icon: User },
+    { name: 'Interactive', path: '/interactive', icon: Gamepad2 },
     { name: 'Settings', path: '/settings', icon: Settings },
   ];
 
