@@ -11,7 +11,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
-      <main className="flex-1">
+      <main className="flex-1 pb-16 lg:pb-0">
         {children}
       </main>
       <Footer />
