@@ -1,9 +1,13 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import AppLayout from '@/components/AppLayout';
 import Sidebar from '@/components/Sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings as SettingsIcon } from 'lucide-react';
+import { Settings as SettingsIcon, Heart, Shield, Users, User } from 'lucide-react';
+import ThemeControls from '@/components/ThemeControls';
+import BlockedUserList from '@/components/BlockedUserList';
+import BreakupPanel from '@/components/BreakupPanel';
+import AccountActions from '@/components/AccountActions';
 
 const Settings = () => {
   return (
@@ -11,7 +15,7 @@ const Settings = () => {
       <div className="flex min-h-screen bg-gray-50 dark:bg-romantic-dark-bg">
         <Sidebar />
         <main className="flex-1 lg:ml-64 p-6">
-          <div className="max-w-7xl mx-auto">
+          <div className="max-w-4xl mx-auto">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                 Settings
@@ -21,19 +25,59 @@ const Settings = () => {
               </p>
             </div>
             
-            <Card className="romantic-card">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <SettingsIcon className="w-5 h-5" />
-                  <span>Account Settings</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Settings functionality will be implemented here. This is where users can manage their profile, privacy, and app preferences.
-                </p>
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              {/* Theme & UI Customization */}
+              <Card className="romantic-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Heart className="w-5 h-5 text-romantic-red" />
+                    <span>Theme & UI Customization</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ThemeControls />
+                </CardContent>
+              </Card>
+
+              {/* Privacy & Block List */}
+              <Card className="romantic-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Shield className="w-5 h-5 text-romantic-red" />
+                    <span>Privacy & Block List</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BlockedUserList />
+                </CardContent>
+              </Card>
+
+              {/* Breakup & Cooldown Management */}
+              <Card className="romantic-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Users className="w-5 h-5 text-romantic-red" />
+                    <span>Relationship Management</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BreakupPanel />
+                </CardContent>
+              </Card>
+
+              {/* Account Controls */}
+              <Card className="romantic-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <User className="w-5 h-5 text-romantic-red" />
+                    <span>Account Controls</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AccountActions />
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </main>
       </div>
