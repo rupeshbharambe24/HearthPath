@@ -11,6 +11,8 @@ import Dashboard from "./pages/Dashboard";
 import Explore from "./pages/Explore";
 import Chat from "./pages/Chat";
 import Settings from "./pages/Settings";
+import MyProfile from "./pages/MyProfile";
+import Interactive from "./pages/Interactive";
 import NotFound from "./pages/NotFound";
 import MobileNav from "./components/MobileNav";
 import ProtectedRoute from "./components/ProtectedRoute";
