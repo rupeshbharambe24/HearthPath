@@ -11,7 +11,7 @@ const Footer = () => {
               <span className="text-white font-bold text-sm">💖</span>
             </div>
             <span className="text-lg font-bold bg-gradient-to-r from-romantic-red to-romantic-pink bg-clip-text text-transparent">
-              CampusHeart
+              CollegeLoveLink
             </span>
           </div>
           <div className="flex space-x-6 text-sm text-gray-600 dark:text-gray-400">
@@ -22,7 +22,7 @@ const Footer = () => {
           </div>
         </div>
         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-center text-sm text-gray-500 dark:text-gray-400">
-          © 2024 CampusHeart. Made with ❤️ for college students.
+          © 2025 CollegeLoveLink. Made with ❤️ for college students.
         </div>
       </div>
     </footer>
