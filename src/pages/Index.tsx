@@ -11,14 +11,18 @@ type AuthState = 'landing' | 'login' | 'signup';
 
 const Index = () => {
   const [authState, setAuthState] = useState<AuthState>('landing');
-  const { login, signup, isAuthenticated, isLoading } = useAuth();
+  const { login, signup, isAuthenticated, isLoading, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/dashboard');
+    if (isAuthenticated && user) {
+      if (user.needsOnboarding) {
+        navigate('/onboarding');
+      } else {
+        navigate('/dashboard');
+      }
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, user, navigate]);
 
   const handleLogin = async (email: string, password: string) => {
     try {

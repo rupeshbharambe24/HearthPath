@@ -4,8 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import UploadInput from './UploadInput';
 
 interface SignupFormProps {
   onSubmit: (data: SignupData) => void;
@@ -23,38 +21,42 @@ export interface SignupData {
 }
 
 const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, onSwitchToLogin }) => {
-  const [formData, setFormData] = useState<SignupData>({
+  const [formData, setFormData] = useState({
     name: '',
     email: '',
-    college: '',
-    branch: '',
-    year: '',
     password: '',
-    photo: null
+    confirmPassword: ''
   });
-  const [photoPreview, setPhotoPreview] = useState<string>('');
 
-  const handleInputChange = (field: keyof SignupData, value: string) => {
+  const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handlePhotoSelect = (file: File) => {
-    setFormData(prev => ({ ...prev, photo: file }));
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setPhotoPreview(e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    
+    if (formData.password !== formData.confirmPassword) {
+      alert('Passwords do not match');
+      return;
+    }
+
+    // Create SignupData object with minimal info for now
+    const signupData: SignupData = {
+      name: formData.name,
+      email: formData.email,
+      password: formData.password,
+      college: '', // Will be filled in onboarding
+      branch: '', // Will be filled in onboarding
+      year: '', // Will be filled in onboarding
+      photo: null // Will be filled in onboarding
+    };
+
+    onSubmit(signupData);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl romantic-card">
+      <Card className="w-full max-w-md romantic-card">
         <CardHeader className="text-center">
           <div className="w-16 h-16 bg-gradient-to-br from-romantic-red to-romantic-pink rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">💖</span>
@@ -63,97 +65,59 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, onSwitchToLogin }) =>
             Join CampusHeart
           </CardTitle>
           <CardDescription>
-            Create your profile and start connecting
+            Create your account to start connecting
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  placeholder="Enter your full name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  required
-                  className="rounded-lg"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">College Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@college.edu"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  required
-                  className="rounded-lg"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="college">College Name</Label>
-                <Input
-                  id="college"
-                  placeholder="University/College name"
-                  value={formData.college}
-                  onChange={(e) => handleInputChange('college', e.target.value)}
-                  required
-                  className="rounded-lg"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="branch">Branch/Major</Label>
-                <Input
-                  id="branch"
-                  placeholder="Computer Science, etc."
-                  value={formData.branch}
-                  onChange={(e) => handleInputChange('branch', e.target.value)}
-                  required
-                  className="rounded-lg"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="year">Academic Year</Label>
-                <Select onValueChange={(value) => handleInputChange('year', value)}>
-                  <SelectTrigger className="rounded-lg">
-                    <SelectValue placeholder="Select year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="freshman">Freshman</SelectItem>
-                    <SelectItem value="sophomore">Sophomore</SelectItem>
-                    <SelectItem value="junior">Junior</SelectItem>
-                    <SelectItem value="senior">Senior</SelectItem>
-                    <SelectItem value="graduate">Graduate</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Create a strong password"
-                  value={formData.password}
-                  onChange={(e) => handleInputChange('password', e.target.value)}
-                  required
-                  className="rounded-lg"
-                />
-              </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Full Name</Label>
+              <Input
+                id="name"
+                placeholder="Enter your full name"
+                value={formData.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
+                required
+                className="rounded-lg"
+              />
             </div>
 
             <div className="space-y-2">
-              <Label>Profile Photo</Label>
-              <UploadInput
-                onFileSelect={handlePhotoSelect}
-                preview={photoPreview}
+              <Label htmlFor="email">College Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@college.edu"
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                required
+                className="rounded-lg"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Create a strong password"
+                value={formData.password}
+                onChange={(e) => handleInputChange('password', e.target.value)}
+                required
+                className="rounded-lg"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="Confirm your password"
+                value={formData.confirmPassword}
+                onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                required
+                className="rounded-lg"
               />
             </div>
 

@@ -15,6 +15,7 @@ interface AuthUser {
   trustScore?: number;
   heartsGiven?: number;
   heartsReceived?: number;
+  needsOnboarding?: boolean;
 }
 
 interface AuthContextType {
@@ -95,6 +96,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
+      // Check if user needs onboarding (profile not complete)
+      const needsOnboarding = !profile || !profile.name || !profile.college_name;
+
       setUser({
         id: authUser.id,
         name: profile?.name || authUser.user_metadata?.name || '',
@@ -106,6 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         trustScore: 75, // Default or calculate
         heartsGiven: 0, // Will be calculated from relationships
         heartsReceived: 0, // Will be calculated from relationships
+        needsOnboarding,
       });
     } catch (error) {
       console.error('Error loading user profile:', error);
@@ -164,24 +169,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (authData.user) {
-        // Update the user profile with additional info
-        const { error: profileError } = await supabase
-          .from('users')
-          .update({
-            name: data.name,
-            college_name: data.college,
-            branch: data.branch,
-            year: parseInt(data.year),
-          })
-          .eq('id', authData.user.id);
-
-        if (profileError) {
-          console.error('Error updating profile:', profileError);
-        }
-
         toast({
-          title: "Welcome to CampusHeart! 🎉",
-          description: "Your account has been created successfully.",
+          title: "Account created! 🎉",
+          description: "Please complete your profile to start connecting.",
         });
       }
     } catch (error: any) {
