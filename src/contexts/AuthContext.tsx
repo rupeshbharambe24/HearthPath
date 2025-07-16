@@ -138,9 +138,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error: any) {
       console.error('Login error:', error);
+      
+      // Provide user-friendly error messages
+      let errorMessage = "Failed to sign in. Please try again.";
+      if (error.message === "Email not confirmed") {
+        errorMessage = "Please check your email and confirm your account before signing in.";
+      } else if (error.message === "Invalid login credentials") {
+        errorMessage = "Invalid email or password. Please check your credentials.";
+      }
+      
       toast({
         title: "Login Failed",
-        description: error.message || "Failed to sign in. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
       throw error;
@@ -153,14 +162,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       
-      // First, sign up the user
+      // Sign up the user with email confirmation disabled for development
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
           data: {
             name: data.name,
-          }
+          },
+          emailRedirectTo: `${window.location.origin}/onboarding`
         }
       });
 
@@ -169,16 +179,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (authData.user) {
-        toast({
-          title: "Account created! 🎉",
-          description: "Please complete your profile to start connecting.",
-        });
+        // If email confirmation is disabled, the user will be automatically logged in
+        // If email confirmation is enabled, they'll need to confirm first
+        if (authData.session) {
+          // User is automatically logged in (email confirmation disabled)
+          toast({
+            title: "Account created! 🎉",
+            description: "Please complete your profile to start connecting.",
+          });
+        } else {
+          // User needs to confirm email
+          toast({
+            title: "Account created! 📧",
+            description: "Please check your email and confirm your account, then sign in.",
+          });
+        }
       }
     } catch (error: any) {
       console.error('Signup error:', error);
+      
+      let errorMessage = "Failed to create account. Please try again.";
+      if (error.message?.includes("already registered")) {
+        errorMessage = "An account with this email already exists. Please sign in instead.";
+      }
+      
       toast({
         title: "Signup Failed",
-        description: error.message || "Failed to create account. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
       throw error;
