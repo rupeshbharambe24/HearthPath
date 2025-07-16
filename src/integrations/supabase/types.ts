@@ -14,7 +14,234 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      fun_posts: {
+        Row: {
+          correct_answer: string | null
+          created_at: string | null
+          id: string
+          message: string | null
+          owner_id: string | null
+          question: string | null
+          target_user: string | null
+          type: string
+          visible_to_target: boolean | null
+        }
+        Insert: {
+          correct_answer?: string | null
+          created_at?: string | null
+          id?: string
+          message?: string | null
+          owner_id?: string | null
+          question?: string | null
+          target_user?: string | null
+          type: string
+          visible_to_target?: boolean | null
+        }
+        Update: {
+          correct_answer?: string | null
+          created_at?: string | null
+          id?: string
+          message?: string | null
+          owner_id?: string | null
+          question?: string | null
+          target_user?: string | null
+          type?: string
+          visible_to_target?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fun_posts_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fun_posts_target_user_fkey"
+            columns: ["target_user"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      memories: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          level_at: number | null
+          memo_text: string | null
+          relationship_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          level_at?: number | null
+          memo_text?: string | null
+          relationship_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          level_at?: number | null
+          memo_text?: string | null
+          relationship_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memories_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memories_relationship_id_fkey"
+            columns: ["relationship_id"]
+            isOneToOne: false
+            referencedRelation: "relationships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          content: string | null
+          content_type: string | null
+          created_at: string | null
+          id: string
+          receiver_id: string | null
+          sender_id: string | null
+        }
+        Insert: {
+          content?: string | null
+          content_type?: string | null
+          created_at?: string | null
+          id?: string
+          receiver_id?: string | null
+          sender_id?: string | null
+        }
+        Update: {
+          content?: string | null
+          content_type?: string | null
+          created_at?: string | null
+          id?: string
+          receiver_id?: string | null
+          sender_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_receiver_id_fkey"
+            columns: ["receiver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      relationships: {
+        Row: {
+          cooldown_until: string | null
+          current_level: number | null
+          hearts_a2b: number | null
+          hearts_b2a: number | null
+          id: string
+          status: string | null
+          trust_score: number | null
+          updated_at: string | null
+          user_a: string | null
+          user_b: string | null
+        }
+        Insert: {
+          cooldown_until?: string | null
+          current_level?: number | null
+          hearts_a2b?: number | null
+          hearts_b2a?: number | null
+          id?: string
+          status?: string | null
+          trust_score?: number | null
+          updated_at?: string | null
+          user_a?: string | null
+          user_b?: string | null
+        }
+        Update: {
+          cooldown_until?: string | null
+          current_level?: number | null
+          hearts_a2b?: number | null
+          hearts_b2a?: number | null
+          id?: string
+          status?: string | null
+          trust_score?: number | null
+          updated_at?: string | null
+          user_a?: string | null
+          user_b?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relationships_user_a_fkey"
+            columns: ["user_a"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "relationships_user_b_fkey"
+            columns: ["user_b"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          about: string | null
+          branch: string | null
+          college_email: string
+          college_name: string | null
+          created_at: string | null
+          hobbies: string[] | null
+          id: string
+          name: string
+          photo_levels: Json | null
+          year: number | null
+        }
+        Insert: {
+          about?: string | null
+          branch?: string | null
+          college_email: string
+          college_name?: string | null
+          created_at?: string | null
+          hobbies?: string[] | null
+          id: string
+          name: string
+          photo_levels?: Json | null
+          year?: number | null
+        }
+        Update: {
+          about?: string | null
+          branch?: string | null
+          college_email?: string
+          college_name?: string | null
+          created_at?: string | null
+          hobbies?: string[] | null
+          id?: string
+          name?: string
+          photo_levels?: Json | null
+          year?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

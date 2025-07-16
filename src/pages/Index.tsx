@@ -6,14 +6,12 @@ import Landing from '@/components/Landing';
 import LoginForm from '@/components/LoginForm';
 import SignupForm, { SignupData } from '@/components/SignupForm';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
 
 type AuthState = 'landing' | 'login' | 'signup';
 
 const Index = () => {
   const [authState, setAuthState] = useState<AuthState>('landing');
-  const { login, signup, isAuthenticated } = useAuth();
-  const { toast } = useToast();
+  const { login, signup, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -22,23 +20,35 @@ const Index = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleLogin = (email: string, password: string) => {
-    console.log('Login attempt:', { email, password });
-    login(email, password);
-    toast({
-      title: "Welcome back! 💖",
-      description: "You've successfully signed in to CampusHeart.",
-    });
+  const handleLogin = async (email: string, password: string) => {
+    try {
+      await login(email, password);
+    } catch (error) {
+      // Error is handled in the AuthContext
+    }
   };
 
-  const handleSignup = (data: SignupData) => {
-    console.log('Signup attempt:', data);
-    signup(data);
-    toast({
-      title: "Welcome to CampusHeart! 🎉",
-      description: "Your account has been created successfully.",
-    });
+  const handleSignup = async (data: SignupData) => {
+    try {
+      await signup(data);
+    } catch (error) {
+      // Error is handled in the AuthContext
+    }
   };
+
+  // Show loading spinner while checking auth state
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-romantic-red mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   const renderContent = () => {
     switch (authState) {
