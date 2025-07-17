@@ -4,52 +4,32 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Send, Heart } from 'lucide-react';
+import { Send } from 'lucide-react';
 import ChatBubble from './ChatBubble';
 import MemoryTrail from './MemoryTrail';
 import RelationshipBadge from './RelationshipBadge';
 import { cn } from '@/lib/utils';
-
-interface Message {
-  id: string;
-  message: string;
-  isOwn: boolean;
-  timestamp: string;
-  senderName?: string;
-}
+import { useMessages } from '@/hooks/useMessages';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface ChatRoomProps {
+  partnerId: string;
   matchName: string;
   relationshipLevel: number;
 }
 
-const ChatRoom: React.FC<ChatRoomProps> = ({ matchName, relationshipLevel }) => {
+const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipLevel }) => {
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      message: 'Hey! I saw you love photography too. What\'s your favorite subject to shoot?',
-      isOwn: false,
-      timestamp: '2:30 PM',
-      senderName: matchName,
-    },
-    {
-      id: '2',
-      message: 'I love capturing nature and candid moments! There\'s something magical about golden hour shots.',
-      isOwn: true,
-      timestamp: '2:32 PM',
-    },
-    {
-      id: '3',
-      message: 'That sounds amazing! I\'d love to go on a photo walk sometime if you\'re up for it.',
-      isOwn: false,
-      timestamp: '2:35 PM',
-      senderName: matchName,
-    },
-  ]);
-
+  const [sending, setSending] = useState(false);
+  const { user } = useAuth();
+  const { getMessagesWithPartner } = useMessages();
+  const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null);
+
+  const messages = getMessagesWithPartner(partnerId);
 
   // Auto-scroll to bottom when new messages are added
   const scrollToBottom = () => {
@@ -59,46 +39,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ matchName, relationshipLevel }) => 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  // Mock memory entries
-  const memories = [
-    {
-      id: '1',
-      type: 'milestone' as const,
-      title: 'First Chat',
-      description: 'You both started your conversation about shared interests',
-      date: '3 days ago',
-      level: 2,
-      icon: '💬'
-    },
-    {
-      id: '2',
-      type: 'heart' as const,
-      title: 'Heart Exchange',
-      description: `${matchName} appreciated your photography passion`,
-      date: '2 days ago',
-      level: 3,
-      icon: '🧡'
-    },
-    {
-      id: '3',
-      type: 'memory' as const,
-      title: 'Common Ground',
-      description: 'Discovered mutual love for outdoor adventures and photography',
-      date: '1 day ago',
-      level: 3,
-      icon: '💑'
-    },
-    {
-      id: '4',
-      type: 'milestone' as const,
-      title: 'Photo Walk Plans',
-      description: 'Exciting plans for your first meetup adventure',
-      date: 'Just now',
-      level: 4,
-      icon: '🎉'
-    }
-  ];
 
   const getChatBackgroundClass = (level: number) => {
     const backgrounds = {
@@ -112,43 +52,36 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ matchName, relationshipLevel }) => 
     return backgrounds[level as keyof typeof backgrounds] || backgrounds[1];
   };
 
-  const getCurrentTime = () => {
-    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  const handleSendMessage = async () => {
+    if (!message.trim() || !user?.id || sending) return;
 
-  const handleSendMessage = () => {
-    if (message.trim()) {
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        message: message.trim(),
-        isOwn: true,
-        timestamp: getCurrentTime(),
-      };
+    try {
+      setSending(true);
       
-      setMessages(prev => [...prev, newMessage]);
+      const { error } = await supabase
+        .from('messages')
+        .insert([{
+          content: message.trim(),
+          sender_id: user.id,
+          receiver_id: partnerId,
+          content_type: 'text'
+        }]);
+
+      if (error) {
+        console.error('Error sending message:', error);
+        toast({
+          title: "Failed to send message",
+          description: "Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setMessage('');
-      
-      // Simulate a response after a delay
-      setTimeout(() => {
-        const responses = [
-          "That's really interesting!",
-          "I'd love to hear more about that 😊",
-          "We should definitely explore this together!",
-          "You have such great taste! 💕",
-          "I'm really enjoying our conversation"
-        ];
-        
-        const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-        const responseMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          message: randomResponse,
-          isOwn: false,
-          timestamp: getCurrentTime(),
-          senderName: matchName,
-        };
-        
-        setMessages(prev => [...prev, responseMessage]);
-      }, 1000 + Math.random() * 2000);
+    } catch (error) {
+      console.error('Error in handleSendMessage:', error);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -183,21 +116,35 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ matchName, relationshipLevel }) => 
               <div 
                 ref={chatAreaRef}
                 className={cn(
-                  "flex-1 p-4 overflow-y-auto max-h-96",
+                  "flex-1 p-4 overflow-y-auto",
                   getChatBackgroundClass(relationshipLevel)
                 )}
                 style={{ scrollbarWidth: 'thin' }}
               >
                 <div className="space-y-2">
-                  {messages.map((msg) => (
-                    <ChatBubble
-                      key={msg.id}
-                      message={msg.message}
-                      isOwn={msg.isOwn}
-                      timestamp={msg.timestamp}
-                      senderName={msg.senderName}
-                    />
-                  ))}
+                  {messages.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 mx-auto mb-4 bg-romantic-light-pink dark:bg-romantic-red/20 rounded-full flex items-center justify-center">
+                        <span className="text-2xl">👋</span>
+                      </div>
+                      <p className="text-gray-500 dark:text-gray-400">
+                        Start your conversation with {matchName}
+                      </p>
+                    </div>
+                  ) : (
+                    messages.map((msg) => (
+                      <ChatBubble
+                        key={msg.id}
+                        message={msg.content || ''}
+                        isOwn={msg.sender_id === user?.id}
+                        timestamp={new Date(msg.created_at).toLocaleTimeString([], { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                        senderName={msg.sender_id === user?.id ? undefined : matchName}
+                      />
+                    ))
+                  )}
                   <div ref={messagesEndRef} />
                 </div>
               </div>
@@ -211,11 +158,12 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ matchName, relationshipLevel }) => 
                     onChange={(e) => setMessage(e.target.value)}
                     onKeyPress={handleKeyPress}
                     className="flex-1"
+                    disabled={sending}
                   />
                   <Button 
                     onClick={handleSendMessage} 
                     className="romantic-btn"
-                    disabled={!message.trim()}
+                    disabled={!message.trim() || sending}
                   >
                     <Send className="w-4 h-4" />
                   </Button>
@@ -224,7 +172,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ matchName, relationshipLevel }) => 
             </TabsContent>
             
             <TabsContent value="memories" className="flex-1 p-4">
-              <MemoryTrail memories={memories} relationshipLevel={relationshipLevel} />
+              <MemoryTrail 
+                partnerId={partnerId}
+                relationshipLevel={relationshipLevel} 
+              />
             </TabsContent>
           </Tabs>
         </CardContent>

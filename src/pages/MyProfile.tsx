@@ -8,24 +8,105 @@ import EditableField from '@/components/EditableField';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { User, Camera, Eye } from 'lucide-react';
+import { useUserData } from '@/hooks/useUserData';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 const MyProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [previewLevel, setPreviewLevel] = useState(1);
+  const [saving, setSaving] = useState(false);
+  const { user } = useAuth();
+  const { profile, loading } = useUserData();
+  const { toast } = useToast();
+
   const [userInfo, setUserInfo] = useState({
-    name: 'Alex Johnson',
-    college: 'Stanford University',
-    branch: 'Computer Science',
-    year: 'Junior',
-    hobbies: 'Photography, Reading, Hiking',
-    aboutMe: 'Love exploring new places and meeting interesting people. Always up for deep conversations over coffee.',
+    name: '',
+    college_name: '',
+    branch: '',
+    year: '',
+    hobbies: '',
+    about: '',
   });
 
-  const handleSave = () => {
-    setIsEditing(false);
-    // Here you would typically save to backend
-    console.log('Profile saved:', userInfo);
+  // Initialize form data when profile loads
+  React.useEffect(() => {
+    if (profile) {
+      setUserInfo({
+        name: profile.name || '',
+        college_name: profile.college_name || '',
+        branch: profile.branch || '',
+        year: profile.year?.toString() || '',
+        hobbies: profile.hobbies?.join(', ') || '',
+        about: profile.about || '',
+      });
+    }
+  }, [profile]);
+
+  const handleSave = async () => {
+    if (!user?.id) return;
+
+    try {
+      setSaving(true);
+      
+      const updateData = {
+        name: userInfo.name,
+        college_name: userInfo.college_name,
+        branch: userInfo.branch,
+        year: userInfo.year ? parseInt(userInfo.year) : null,
+        hobbies: userInfo.hobbies ? userInfo.hobbies.split(',').map(h => h.trim()) : [],
+        about: userInfo.about,
+      };
+
+      const { error } = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Error updating profile:', error);
+        toast({
+          title: "Failed to save profile",
+          description: "Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Profile updated! ✨",
+        description: "Your changes have been saved successfully.",
+      });
+
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error in handleSave:', error);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex min-h-screen bg-gray-50 dark:bg-romantic-dark-bg">
+          <Sidebar />
+          <main className="flex-1 lg:ml-64 p-6">
+            <div className="max-w-6xl mx-auto">
+              <div className="animate-pulse space-y-8">
+                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -54,8 +135,9 @@ const MyProfile = () => {
                     <Button
                       onClick={() => isEditing ? handleSave() : setIsEditing(true)}
                       className="romantic-btn text-sm"
+                      disabled={saving}
                     >
-                      {isEditing ? 'Save' : 'Edit'}
+                      {saving ? 'Saving...' : isEditing ? 'Save' : 'Edit'}
                     </Button>
                   </CardTitle>
                 </CardHeader>
@@ -68,9 +150,9 @@ const MyProfile = () => {
                   />
                   <EditableField
                     label="College"
-                    value={userInfo.college}
+                    value={userInfo.college_name}
                     isEditing={isEditing}
-                    onChange={(value) => setUserInfo({...userInfo, college: value})}
+                    onChange={(value) => setUserInfo({...userInfo, college_name: value})}
                   />
                   <EditableField
                     label="Branch"
@@ -93,9 +175,9 @@ const MyProfile = () => {
                   />
                   <EditableField
                     label="About Me"
-                    value={userInfo.aboutMe}
+                    value={userInfo.about}
                     isEditing={isEditing}
-                    onChange={(value) => setUserInfo({...userInfo, aboutMe: value})}
+                    onChange={(value) => setUserInfo({...userInfo, about: value})}
                     multiline
                   />
                 </CardContent>
