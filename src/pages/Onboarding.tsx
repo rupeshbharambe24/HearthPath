@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import UploadInput from '@/components/UploadInput';
-import { Heart } from 'lucide-react';
+import { Heart, AlertCircle, CheckCircle } from 'lucide-react';
 
 const Onboarding = () => {
   const [formData, setFormData] = useState({
@@ -25,6 +25,7 @@ const Onboarding = () => {
   });
   const [photoPreview, setPhotoPreview] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -50,6 +51,8 @@ const Onboarding = () => {
   const handlePhotoSelect = (file: File) => {
     console.log('Photo selected:', file.name, file.size);
     setFormData(prev => ({ ...prev, photo: file }));
+    setUploadStatus('idle');
+    
     const reader = new FileReader();
     reader.onload = (e) => {
       setPhotoPreview(e.target?.result as string);
@@ -60,11 +63,26 @@ const Onboarding = () => {
   const uploadPhoto = async (file: File): Promise<string | null> => {
     try {
       console.log('Starting photo upload...');
+      setUploadStatus('uploading');
+      
       const fileExt = file.name.split('.').pop();
       const fileName = `${user?.id}/level_1.${fileExt}`;
       
       console.log('Uploading to:', fileName);
       
+      // Check if bucket exists first
+      const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
+      if (bucketError) {
+        console.error('Error checking buckets:', bucketError);
+        throw new Error('Failed to access storage');
+      }
+      
+      const profilePhotosBucket = buckets.find(bucket => bucket.id === 'profile-photos');
+      if (!profilePhotosBucket) {
+        throw new Error('Storage bucket not found. Please contact support.');
+      }
+      
+      // Upload the file
       const { error: uploadError } = await supabase.storage
         .from('profile-photos')
         .upload(fileName, file, {
@@ -73,7 +91,7 @@ const Onboarding = () => {
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
-        throw uploadError;
+        throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
       const { data } = supabase.storage
@@ -81,9 +99,11 @@ const Onboarding = () => {
         .getPublicUrl(fileName);
 
       console.log('Photo uploaded successfully:', data.publicUrl);
+      setUploadStatus('success');
       return data.publicUrl;
     } catch (error) {
       console.error('Error uploading photo:', error);
+      setUploadStatus('error');
       throw error;
     }
   };
@@ -103,40 +123,22 @@ const Onboarding = () => {
     }
 
     // Validate required fields
-    if (!formData.name.trim()) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter your name.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const requiredFields = [
+      { field: 'name', label: 'Name' },
+      { field: 'college_name', label: 'College name' },
+      { field: 'branch', label: 'Branch/major' },
+      { field: 'year', label: 'Academic year' }
+    ];
 
-    if (!formData.college_name.trim()) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter your college name.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!formData.branch.trim()) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter your branch/major.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!formData.year) {
-      toast({
-        title: "Missing Information",
-        description: "Please select your academic year.",
-        variant: "destructive",
-      });
-      return;
+    for (const { field, label } of requiredFields) {
+      if (!formData[field as keyof typeof formData] || (formData[field as keyof typeof formData] as string).trim() === '') {
+        toast({
+          title: "Missing Information",
+          description: `Please enter your ${label.toLowerCase()}.`,
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -173,7 +175,7 @@ const Onboarding = () => {
 
       if (error) {
         console.error('Database update error:', error);
-        throw error;
+        throw new Error(`Profile update failed: ${error.message}`);
       }
 
       console.log('Profile updated successfully:', data);
@@ -202,6 +204,20 @@ const Onboarding = () => {
       });
     } finally {
       setIsSubmitting(false);
+      setUploadStatus('idle');
+    }
+  };
+
+  const getUploadStatusIcon = () => {
+    switch (uploadStatus) {
+      case 'uploading':
+        return <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-romantic-red"></div>;
+      case 'success':
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'error':
+        return <AlertCircle className="w-4 h-4 text-red-500" />;
+      default:
+        return null;
     }
   };
 
@@ -308,7 +324,10 @@ const Onboarding = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Profile Photo (Level 1 - Anonymous)</Label>
+                <div className="flex items-center gap-2">
+                  <Label>Profile Photo (Level 1 - Anonymous)</Label>
+                  {getUploadStatusIcon()}
+                </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   Upload a photo that doesn't show your face - this will be visible to everyone at Level 1
                 </p>
@@ -316,14 +335,24 @@ const Onboarding = () => {
                   onFileSelect={handlePhotoSelect}
                   preview={photoPreview}
                 />
+                {uploadStatus === 'error' && (
+                  <p className="text-red-500 text-sm">
+                    Photo upload failed. Please try again or skip for now.
+                  </p>
+                )}
               </div>
 
               <Button 
                 type="submit" 
                 className="w-full romantic-btn"
-                disabled={isSubmitting}
+                disabled={isSubmitting || uploadStatus === 'uploading'}
               >
-                {isSubmitting ? 'Setting up your profile...' : 'Complete Profile & Start Connecting'}
+                {isSubmitting 
+                  ? 'Setting up your profile...' 
+                  : uploadStatus === 'uploading'
+                  ? 'Uploading photo...'
+                  : 'Complete Profile & Start Connecting'
+                }
               </Button>
             </form>
           </CardContent>
