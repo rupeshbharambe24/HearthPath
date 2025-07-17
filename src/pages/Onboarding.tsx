@@ -48,6 +48,7 @@ const Onboarding = () => {
   };
 
   const handlePhotoSelect = (file: File) => {
+    console.log('Photo selected:', file.name, file.size);
     setFormData(prev => ({ ...prev, photo: file }));
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -58,8 +59,11 @@ const Onboarding = () => {
 
   const uploadPhoto = async (file: File): Promise<string | null> => {
     try {
+      console.log('Starting photo upload...');
       const fileExt = file.name.split('.').pop();
       const fileName = `${user?.id}/level_1.${fileExt}`;
+      
+      console.log('Uploading to:', fileName);
       
       const { error: uploadError } = await supabase.storage
         .from('profile-photos')
@@ -69,23 +73,71 @@ const Onboarding = () => {
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
-        return null;
+        throw uploadError;
       }
 
       const { data } = supabase.storage
         .from('profile-photos')
         .getPublicUrl(fileName);
 
+      console.log('Photo uploaded successfully:', data.publicUrl);
       return data.publicUrl;
     } catch (error) {
       console.error('Error uploading photo:', error);
-      return null;
+      throw error;
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    console.log('Form submission started');
+    
+    if (!user) {
+      console.error('No user found');
+      toast({
+        title: "Error",
+        description: "You must be logged in to complete onboarding.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate required fields
+    if (!formData.name.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter your name.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.college_name.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter your college name.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.branch.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter your branch/major.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.year) {
+      toast({
+        title: "Missing Information",
+        description: "Please select your academic year.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     
@@ -94,47 +146,58 @@ const Onboarding = () => {
       
       // Upload photo if provided
       if (formData.photo) {
+        console.log('Uploading photo...');
         photoUrl = await uploadPhoto(formData.photo);
-        if (!photoUrl) {
-          toast({
-            title: "Photo upload failed",
-            description: "Please try uploading your photo again.",
-            variant: "destructive",
-          });
-          setIsSubmitting(false);
-          return;
-        }
       }
 
+      console.log('Updating user profile...');
+      
       // Update user profile
-      const { error } = await supabase
+      const updateData = {
+        name: formData.name.trim(),
+        college_name: formData.college_name.trim(),
+        branch: formData.branch.trim(),
+        year: parseInt(formData.year),
+        about: formData.about.trim() || null,
+        hobbies: formData.hobbies.length > 0 ? formData.hobbies : null,
+        photo_levels: photoUrl ? { level_1: photoUrl } : {}
+      };
+
+      console.log('Update data:', updateData);
+
+      const { error, data } = await supabase
         .from('users')
-        .update({
-          name: formData.name,
-          college_name: formData.college_name,
-          branch: formData.branch,
-          year: parseInt(formData.year),
-          about: formData.about,
-          hobbies: formData.hobbies,
-          photo_levels: photoUrl ? { level_1: photoUrl } : {}
-        })
-        .eq('id', user.id);
+        .update(updateData)
+        .eq('id', user.id)
+        .select();
 
       if (error) {
+        console.error('Database update error:', error);
         throw error;
       }
+
+      console.log('Profile updated successfully:', data);
 
       toast({
         title: "Welcome to CampusHeart! 💖",
         description: "Your profile has been set up successfully.",
       });
 
+      // Navigate to dashboard
       navigate('/dashboard');
     } catch (error: any) {
-      console.error('Error updating profile:', error);
+      console.error('Error in handleSubmit:', error);
+      
+      let errorMessage = "Please try again.";
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.details) {
+        errorMessage = error.details;
+      }
+      
       toast({
         title: "Profile setup failed",
-        description: error.message || "Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -161,7 +224,7 @@ const Onboarding = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
+                  <Label htmlFor="name">Full Name *</Label>
                   <Input
                     id="name"
                     placeholder="Enter your full name"
@@ -172,7 +235,7 @@ const Onboarding = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="college_name">College Name</Label>
+                  <Label htmlFor="college_name">College Name *</Label>
                   <Input
                     id="college_name"
                     placeholder="Your college/university"
@@ -186,7 +249,7 @@ const Onboarding = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="branch">Branch/Major</Label>
+                  <Label htmlFor="branch">Branch/Major *</Label>
                   <Input
                     id="branch"
                     placeholder="Computer Science, etc."
@@ -197,8 +260,8 @@ const Onboarding = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="year">Academic Year</Label>
-                  <Select onValueChange={(value) => handleInputChange('year', value)}>
+                  <Label htmlFor="year">Academic Year *</Label>
+                  <Select onValueChange={(value) => handleInputChange('year', value)} required>
                     <SelectTrigger className="rounded-lg">
                       <SelectValue placeholder="Select year" />
                     </SelectTrigger>
