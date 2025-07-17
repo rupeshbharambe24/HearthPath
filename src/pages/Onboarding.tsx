@@ -60,27 +60,61 @@ const Onboarding = () => {
     reader.readAsDataURL(file);
   };
 
+  const createBucketIfNotExists = async () => {
+    try {
+      console.log('Checking if profile-photos bucket exists...');
+      
+      // First, try to list buckets to see if profile-photos exists
+      const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+      
+      if (listError) {
+        console.error('Error listing buckets:', listError);
+        throw new Error('Unable to access storage');
+      }
+      
+      console.log('Available buckets:', buckets);
+      
+      const profilePhotosBucket = buckets.find(bucket => bucket.id === 'profile-photos');
+      
+      if (!profilePhotosBucket) {
+        console.log('profile-photos bucket not found, attempting to create...');
+        
+        // Try to create the bucket
+        const { data: createData, error: createError } = await supabase.storage.createBucket('profile-photos', {
+          public: true,
+          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/jpg'],
+          fileSizeLimit: 5242880 // 5MB
+        });
+        
+        if (createError) {
+          console.error('Error creating bucket:', createError);
+          throw new Error(`Failed to create storage bucket: ${createError.message}`);
+        }
+        
+        console.log('Successfully created profile-photos bucket:', createData);
+        return true;
+      }
+      
+      console.log('profile-photos bucket already exists');
+      return true;
+    } catch (error) {
+      console.error('Error in createBucketIfNotExists:', error);
+      throw error;
+    }
+  };
+
   const uploadPhoto = async (file: File): Promise<string | null> => {
     try {
       console.log('Starting photo upload...');
       setUploadStatus('uploading');
       
+      // First ensure the bucket exists
+      await createBucketIfNotExists();
+      
       const fileExt = file.name.split('.').pop();
       const fileName = `${user?.id}/level_1.${fileExt}`;
       
       console.log('Uploading to:', fileName);
-      
-      // Check if bucket exists first
-      const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
-      if (bucketError) {
-        console.error('Error checking buckets:', bucketError);
-        throw new Error('Failed to access storage');
-      }
-      
-      const profilePhotosBucket = buckets.find(bucket => bucket.id === 'profile-photos');
-      if (!profilePhotosBucket) {
-        throw new Error('Storage bucket not found. Please contact support.');
-      }
       
       // Upload the file
       const { error: uploadError } = await supabase.storage
@@ -149,7 +183,16 @@ const Onboarding = () => {
       // Upload photo if provided
       if (formData.photo) {
         console.log('Uploading photo...');
-        photoUrl = await uploadPhoto(formData.photo);
+        try {
+          photoUrl = await uploadPhoto(formData.photo);
+        } catch (photoError) {
+          console.error('Photo upload failed, but continuing with profile creation:', photoError);
+          toast({
+            title: "Photo upload failed",
+            description: "Your profile will be created without a photo. You can add one later.",
+            variant: "destructive",
+          });
+        }
       }
 
       console.log('Updating user profile...');
@@ -182,7 +225,9 @@ const Onboarding = () => {
 
       toast({
         title: "Welcome to CampusHeart! 💖",
-        description: "Your profile has been set up successfully.",
+        description: photoUrl 
+          ? "Your profile has been set up successfully with your photo!"
+          : "Your profile has been set up successfully!",
       });
 
       // Navigate to dashboard
@@ -337,7 +382,7 @@ const Onboarding = () => {
                 />
                 {uploadStatus === 'error' && (
                   <p className="text-red-500 text-sm">
-                    Photo upload failed. Please try again or skip for now.
+                    Photo upload failed. Your profile will be created without a photo.
                   </p>
                 )}
               </div>
