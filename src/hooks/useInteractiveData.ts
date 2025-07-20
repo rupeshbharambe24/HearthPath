@@ -102,14 +102,22 @@ export const useInteractiveData = () => {
         event: '*',
         schema: 'public',
         table: 'relationships',
-        filter: `user_a=eq.${user.id},user_b=eq.${user.id}`
+        filter: `user_a=eq.${user.id}`
+      }, () => {
+        fetchInteractiveData();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'relationships',
+        filter: `user_b=eq.${user.id}`
       }, () => {
         fetchInteractiveData();
       })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(relationshipChannel);
+      relationshipChannel.unsubscribe();
     };
   }, [user?.id]);
 

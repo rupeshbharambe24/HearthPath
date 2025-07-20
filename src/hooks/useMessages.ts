@@ -93,12 +93,21 @@ export const useMessages = () => {
 
     // Set up real-time subscription for messages
     const channel = supabase
-      .channel('messages')
+      .channel('messages-realtime')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'messages',
-        filter: `or(sender_id.eq.${user.id},receiver_id.eq.${user.id})`
+        filter: `sender_id=eq.${user.id}`
+      }, (payload) => {
+        console.log('Real-time message update:', payload);
+        fetchMessages(); // Refetch messages on any change
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'messages',
+        filter: `receiver_id=eq.${user.id}`
       }, (payload) => {
         console.log('Real-time message update:', payload);
         fetchMessages(); // Refetch messages on any change
@@ -106,7 +115,7 @@ export const useMessages = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      channel.unsubscribe();
     };
   }, [user?.id]);
 
