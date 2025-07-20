@@ -6,11 +6,11 @@ import { useAuth } from '@/contexts/AuthContext';
 interface UserProfile {
   id: string;
   name: string;
-  college_name: string;
-  branch: string;
-  year: number;
-  about: string;
-  hobbies: string[];
+  college_name: string | null;
+  branch: string | null;
+  year: number | null;
+  about: string | null;
+  hobbies: string[] | null;
   photo_levels: any;
 }
 
@@ -75,7 +75,16 @@ export const useUserData = () => {
             
             return {
               ...rel,
-              partner: rel.partner || { id: partnerId, name: 'Unknown User' }
+              partner: rel.partner || { 
+                id: partnerId, 
+                name: 'Unknown User',
+                college_name: null,
+                branch: null,
+                year: null,
+                about: null,
+                hobbies: null,
+                photo_levels: null
+              }
             };
           }) || [];
 

@@ -206,7 +206,14 @@ const MyProfile = () => {
                       ))}
                     </select>
                   </div>
-                  <LevelPreview userInfo={userInfo} level={previewLevel} />
+                  <LevelPreview userInfo={{
+                    name: userInfo.name,
+                    college: userInfo.college_name,
+                    branch: userInfo.branch,
+                    year: userInfo.year,
+                    hobbies: userInfo.hobbies,
+                    aboutMe: userInfo.about
+                  }} level={previewLevel} />
                 </CardContent>
               </Card>
             </div>
