@@ -91,31 +91,52 @@ export const useMessages = () => {
 
     fetchMessages();
 
-    // Set up real-time subscription for messages
-    const channel = supabase
-      .channel('messages-realtime')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'messages',
-        filter: `sender_id=eq.${user.id}`
-      }, (payload) => {
-        console.log('Real-time message update:', payload);
-        fetchMessages(); // Refetch messages on any change
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'messages',
-        filter: `receiver_id=eq.${user.id}`
-      }, (payload) => {
-        console.log('Real-time message update:', payload);
-        fetchMessages(); // Refetch messages on any change
-      })
-      .subscribe();
+    // Set up real-time subscription for messages with error handling
+    let messagesChannel: any = null;
+    
+    const setupRealtimeSubscription = () => {
+      try {
+        messagesChannel = supabase
+          .channel(`messages-realtime-${user.id}`)
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'messages',
+            filter: `sender_id=eq.${user.id}`
+          }, (payload) => {
+            console.log('Real-time message update:', payload);
+            setTimeout(() => fetchMessages(), 100);
+          })
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'messages',
+            filter: `receiver_id=eq.${user.id}`
+          }, (payload) => {
+            console.log('Real-time message update:', payload);
+            setTimeout(() => fetchMessages(), 100);
+          })
+          .subscribe((status) => {
+            if (status !== 'SUBSCRIBED') {
+              console.log('Messages realtime subscription status:', status);
+              if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                setTimeout(setupRealtimeSubscription, 5000);
+              }
+            }
+          });
+      } catch (error) {
+        console.error('Error setting up messages realtime subscription:', error);
+      }
+    };
+
+    // Delay initial subscription to avoid connection issues
+    const subscriptionTimeout = setTimeout(setupRealtimeSubscription, 2000);
 
     return () => {
-      channel.unsubscribe();
+      clearTimeout(subscriptionTimeout);
+      if (messagesChannel) {
+        messagesChannel.unsubscribe();
+      }
     };
   }, [user?.id]);
 

@@ -95,29 +95,50 @@ export const useInteractiveData = () => {
 
     fetchInteractiveData();
 
-    // Set up real-time subscription for relationship updates
-    const relationshipChannel = supabase
-      .channel('relationships-changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'relationships',
-        filter: `user_a=eq.${user.id}`
-      }, () => {
-        fetchInteractiveData();
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'relationships',
-        filter: `user_b=eq.${user.id}`
-      }, () => {
-        fetchInteractiveData();
-      })
-      .subscribe();
+    // Set up real-time subscription for relationship updates with error handling
+    let relationshipChannel: any = null;
+    
+    const setupRealtimeSubscription = () => {
+      try {
+        relationshipChannel = supabase
+          .channel(`relationships-changes-${user.id}`)
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'relationships',
+            filter: `user_a=eq.${user.id}`
+          }, () => {
+            setTimeout(() => fetchInteractiveData(), 100);
+          })
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'relationships',
+            filter: `user_b=eq.${user.id}`
+          }, () => {
+            setTimeout(() => fetchInteractiveData(), 100);
+          })
+          .subscribe((status) => {
+            if (status !== 'SUBSCRIBED') {
+              console.log('Realtime subscription status:', status);
+              if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                setTimeout(setupRealtimeSubscription, 5000);
+              }
+            }
+          });
+      } catch (error) {
+        console.error('Error setting up realtime subscription:', error);
+      }
+    };
+
+    // Delay initial subscription to avoid connection issues
+    const subscriptionTimeout = setTimeout(setupRealtimeSubscription, 1000);
 
     return () => {
-      relationshipChannel.unsubscribe();
+      clearTimeout(subscriptionTimeout);
+      if (relationshipChannel) {
+        relationshipChannel.unsubscribe();
+      }
     };
   }, [user?.id]);
 
