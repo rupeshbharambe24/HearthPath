@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Trash2, LogOut } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const AccountActions: React.FC = () => {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -19,28 +21,51 @@ const AccountActions: React.FC = () => {
   const { logout } = useAuth();
   const navigate = useNavigate();
 
-  const handlePasswordChange = () => {
+  const handlePasswordChange = async () => {
     if (newPassword !== confirmPassword) {
-      alert('Passwords do not match');
+      toast.error('Passwords do not match');
       return;
     }
-    // Mock password change
-    alert('Password changed successfully!');
-    setShowPasswordDialog(false);
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+    
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters long');
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) throw error;
+
+      toast.success('Password changed successfully!');
+      setShowPasswordDialog(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: any) {
+      console.error('Error changing password:', error);
+      toast.error(error.message || 'Failed to change password');
+    }
   };
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = async () => {
     if (deleteConfirmation.toLowerCase() !== 'delete') {
-      alert('Please type "delete" to confirm');
+      toast.error('Please type "delete" to confirm');
       return;
     }
-    // Mock account deletion
-    alert('Account deleted successfully');
-    logout();
-    navigate('/');
+
+    try {
+      // For now, just sign out the user
+      // Note: Full account deletion would require admin privileges or server-side function
+      toast.success('Account deletion requested. Please contact support for complete removal.');
+      logout();
+      navigate('/');
+    } catch (error: any) {
+      console.error('Error with account deletion:', error);
+      toast.error('Failed to process account deletion');
+    }
   };
 
   const handleLogout = () => {

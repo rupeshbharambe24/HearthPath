@@ -1,32 +1,108 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Heart, Users } from 'lucide-react';
 import CooldownTimer from '@/components/CooldownTimer';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 const BreakupPanel: React.FC = () => {
-  const [isInRelationship, setIsInRelationship] = useState(true);
-  const [isInCooldown, setIsInCooldown] = useState(false);
+  const [relationship, setRelationship] = useState<any>(null);
   const [showBreakupDialog, setShowBreakupDialog] = useState(false);
-  const [cooldownStart] = useState(new Date('2024-01-01T10:00:00'));
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
-  // Mock partner data
-  const partner = {
-    name: 'Emma Rodriguez',
-    college: 'Psychology',
-    relationshipLevel: 6,
-    daysTogther: 45
+  useEffect(() => {
+    fetchCurrentRelationship();
+  }, [user]);
+
+  const fetchCurrentRelationship = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('relationships')
+        .select(`
+          id,
+          user_a,
+          user_b,
+          current_level,
+          status,
+          cooldown_until,
+          updated_at,
+          partner:users!relationships_user_b_fkey (
+            id,
+            name,
+            college_name,
+            branch
+          )
+        `)
+        .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
+        .eq('status', 'active')
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      if (data) {
+        // Get the partner info based on who is the current user
+        const partnerId = data.user_a === user.id ? data.user_b : data.user_a;
+        const { data: partnerData } = await supabase
+          .from('users')
+          .select('id, name, college_name, branch')
+          .eq('id', partnerId)
+          .single();
+
+        setRelationship({
+          ...data,
+          partner: partnerData,
+          daysTogther: Math.floor((new Date().getTime() - new Date(data.updated_at).getTime()) / (1000 * 3600 * 24))
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching relationship:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleBreakup = () => {
-    setIsInRelationship(false);
-    setIsInCooldown(true);
-    setShowBreakupDialog(false);
+  const handleBreakup = async () => {
+    if (!relationship) return;
+
+    try {
+      const { error } = await supabase
+        .from('relationships')
+        .update({
+          status: 'ended',
+          cooldown_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        })
+        .eq('id', relationship.id);
+
+      if (error) throw error;
+
+      toast.success('Relationship ended. You both are in a 7-day cooldown period.');
+      setRelationship(null);
+      setShowBreakupDialog(false);
+    } catch (error) {
+      console.error('Error ending relationship:', error);
+      toast.error('Failed to end relationship');
+    }
   };
 
-  if (isInCooldown) {
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-romantic-red mx-auto"></div>
+        <p className="text-gray-600 dark:text-gray-400 mt-4">Loading relationship status...</p>
+      </div>
+    );
+  }
+
+  if (relationship?.cooldown_until && new Date(relationship.cooldown_until) > new Date()) {
     return (
       <div className="space-y-4">
         <div className="text-center">
@@ -41,7 +117,7 @@ const BreakupPanel: React.FC = () => {
           </p>
         </div>
         
-        <CooldownTimer startTime={cooldownStart} />
+        <CooldownTimer startTime={new Date(relationship.cooldown_until)} />
         
         <div className="bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800 rounded-lg p-4">
           <p className="text-sm text-pink-800 dark:text-pink-200 text-center">
@@ -52,7 +128,7 @@ const BreakupPanel: React.FC = () => {
     );
   }
 
-  if (!isInRelationship) {
+  if (!relationship) {
     return (
       <div className="text-center py-8">
         <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -77,10 +153,10 @@ const BreakupPanel: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {partner.name}
+                  {relationship.partner?.name}
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {partner.college} • Level {partner.relationshipLevel} • {partner.daysTogther} days together
+                  {relationship.partner?.college_name} • Level {relationship.current_level} • {relationship.daysTogther} days together
                 </p>
               </div>
             </div>
@@ -111,7 +187,7 @@ const BreakupPanel: React.FC = () => {
           <DialogHeader>
             <DialogTitle>End Relationship?</DialogTitle>
             <DialogDescription>
-              Are you sure you want to end your relationship with {partner.name}? This action cannot be undone, and you'll both enter a 7-day cooldown period.
+              Are you sure you want to end your relationship with {relationship?.partner?.name}? This action cannot be undone, and you'll both enter a 7-day cooldown period.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

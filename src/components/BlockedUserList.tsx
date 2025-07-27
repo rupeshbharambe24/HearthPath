@@ -1,35 +1,96 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Shield, X } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 interface BlockedUser {
   id: string;
   name: string;
-  college: string;
+  college_name: string;
   blockedDate: string;
+  blocked_id: string;
 }
 
 const BlockedUserList: React.FC = () => {
-  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([
-    {
-      id: '1',
-      name: 'Alex Johnson',
-      college: 'Computer Science',
-      blockedDate: '2024-01-15'
-    },
-    {
-      id: '2',
-      name: 'Sarah Williams',
-      college: 'Business Administration',
-      blockedDate: '2024-01-10'
-    }
-  ]);
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
-  const handleUnblock = (userId: string) => {
-    setBlockedUsers(prev => prev.filter(user => user.id !== userId));
+  useEffect(() => {
+    fetchBlockedUsers();
+  }, [user]);
+
+  const fetchBlockedUsers = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('blocked_users')
+        .select(`
+          id,
+          blocked_id,
+          created_at
+        `)
+        .eq('blocker_id', user.id);
+
+      if (error) throw error;
+
+      // Get user details for blocked users
+      const blockedUserIds = data?.map(item => item.blocked_id) || [];
+      const { data: userData } = await supabase
+        .from('users')
+        .select('id, name, college_name')
+        .in('id', blockedUserIds);
+
+      const formattedUsers = data?.map(item => {
+        const userInfo = userData?.find(u => u.id === item.blocked_id);
+        return {
+          id: item.id,
+          blocked_id: item.blocked_id,
+          name: userInfo?.name || 'Unknown User',
+          college_name: userInfo?.college_name || 'Unknown College',
+          blockedDate: item.created_at
+        };
+      }) || [];
+
+      setBlockedUsers(formattedUsers);
+    } catch (error) {
+      console.error('Error fetching blocked users:', error);
+      toast.error('Failed to load blocked users');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleUnblock = async (blockId: string) => {
+    try {
+      const { error } = await supabase
+        .from('blocked_users')
+        .delete()
+        .eq('id', blockId);
+
+      if (error) throw error;
+
+      setBlockedUsers(prev => prev.filter(user => user.id !== blockId));
+      toast.success('User unblocked successfully');
+    } catch (error) {
+      console.error('Error unblocking user:', error);
+      toast.error('Failed to unblock user');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-romantic-red mx-auto"></div>
+        <p className="text-gray-600 dark:text-gray-400 mt-4">Loading blocked users...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -66,7 +127,7 @@ const BlockedUserList: React.FC = () => {
                       {user.name}
                     </h4>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {user.college} • Blocked on {new Date(user.blockedDate).toLocaleDateString()}
+                      {user.college_name} • Blocked on {new Date(user.blockedDate).toLocaleDateString()}
                     </p>
                   </div>
                   <Button
