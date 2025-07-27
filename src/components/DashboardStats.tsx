@@ -12,6 +12,8 @@ interface DashboardStatsProps {
     heartsGiven: number;
     heartsReceived: number;
     totalMatches: number;
+    totalMemories: number;
+    lastInteraction: string | null;
     recentMatches: Array<{
       id: string;
       name: string;
@@ -77,6 +79,45 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ userStats }) => {
         </CardContent>
       </Card>
 
+      {/* Memories Card */}
+      <Card className="romantic-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+            Memories
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center">
+            <div className="text-3xl font-bold text-romantic-red mb-1">
+              {userStats.totalMemories}
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Captured moments
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Last Interaction Card */}
+      <Card className="romantic-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+            Last Activity
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center">
+            <MessageSquare className="w-6 h-6 text-romantic-pink mx-auto mb-2" />
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {userStats.lastInteraction 
+                ? new Date(userStats.lastInteraction).toLocaleDateString()
+                : 'No recent activity'
+              }
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Match History Card */}
       <Card className="romantic-card md:col-span-2 lg:col-span-3">
         <CardHeader>
@@ -86,17 +127,28 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ userStats }) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {userStats.recentMatches.map((match) => (
-              <div key={match.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-romantic-dark-card rounded-lg">
-                <div>
-                  <div className="font-medium text-gray-800 dark:text-gray-200">{match.name}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">{match.college}</div>
+          {userStats.recentMatches.length > 0 ? (
+            <div className="space-y-3">
+              {userStats.recentMatches.map((match) => (
+                <div key={match.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-romantic-dark-card rounded-lg">
+                  <div>
+                    <div className="font-medium text-gray-800 dark:text-gray-200">{match.name}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">{match.college}</div>
+                  </div>
+                  <RelationshipBadge level={match.level} />
                 </div>
-                <RelationshipBadge level={match.level} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="w-12 h-12 mx-auto mb-4 bg-romantic-light-pink dark:bg-romantic-red/20 rounded-full flex items-center justify-center">
+                <span className="text-xl">💝</span>
               </div>
-            ))}
-          </div>
+              <p className="text-gray-500 dark:text-gray-400">
+                No matches yet. Start exploring to find connections!
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

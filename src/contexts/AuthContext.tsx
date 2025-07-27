@@ -85,15 +85,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadUserProfile = async (authUser: User) => {
     try {
-      const { data: profile, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
+      // Add retry logic for network issues
+      let retries = 3;
+      let profile = null;
+      
+      while (retries > 0) {
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', authUser.id)
+            .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.error('Error loading profile:', error);
-        return;
+          if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+            throw error;
+          }
+          
+          profile = data;
+          break;
+        } catch (error: any) {
+          retries--;
+          if (retries === 0) {
+            console.error('Error loading profile after retries:', error);
+            // Continue with basic auth data even if profile fetch fails
+            break;
+          }
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       }
 
       // Check if user needs onboarding (profile not complete)

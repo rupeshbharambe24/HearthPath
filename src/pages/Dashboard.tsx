@@ -4,11 +4,11 @@ import AppLayout from '@/components/AppLayout';
 import Sidebar from '@/components/Sidebar';
 import DashboardStats from '@/components/DashboardStats';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserData } from '@/hooks/useUserData';
+import { useDashboardData } from '@/hooks/useDashboardData';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { profile, relationships, loading } = useUserData();
+  const { stats, loading } = useDashboardData();
 
   if (loading) {
     return (
@@ -32,20 +32,6 @@ const Dashboard = () => {
     );
   }
 
-  // Calculate user stats from real data
-  const userStats = {
-    currentLevel: relationships.length > 0 ? Math.max(...relationships.map(r => r.current_level)) : 1,
-    trustScore: relationships.length > 0 ? Math.round(relationships.reduce((sum, r) => sum + r.trust_score, 0) / relationships.length) : 75,
-    heartsGiven: relationships.reduce((sum, r) => sum + (r.user_a === user?.id ? r.hearts_a2b : r.hearts_b2a), 0),
-    heartsReceived: relationships.reduce((sum, r) => sum + (r.user_a === user?.id ? r.hearts_b2a : r.hearts_a2b), 0),
-    totalMatches: relationships.length,
-    recentMatches: relationships.slice(0, 3).map(rel => ({
-      id: rel.id,
-      name: rel.partner?.name || 'Unknown User',
-      college: rel.partner?.college_name || 'Unknown College',
-      level: rel.current_level || 1,
-    })),
-  };
 
   return (
     <AppLayout>
@@ -55,16 +41,16 @@ const Dashboard = () => {
           <div className="max-w-7xl mx-auto">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                Welcome back, {profile?.name || user?.name || 'User'}!
+                Welcome back, {user?.name || 'User'}!
               </h1>
               <p className="text-gray-600 dark:text-gray-400">
                 Here's your romantic journey overview.
               </p>
             </div>
             
-            <DashboardStats userStats={userStats} />
+            <DashboardStats userStats={stats} />
             
-            {relationships.length === 0 && (
+            {stats.totalMatches === 0 && (
               <div className="mt-8 text-center p-8 bg-white dark:bg-romantic-dark-card rounded-lg shadow-sm">
                 <div className="w-16 h-16 mx-auto mb-4 bg-romantic-light-pink dark:bg-romantic-red/20 rounded-full flex items-center justify-center">
                   <span className="text-2xl">💕</span>
