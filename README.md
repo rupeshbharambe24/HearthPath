@@ -71,3 +71,19 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Supabase recovery
+
+This repo no longer hardcodes a single Supabase project. Configure the app with:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
+Create `.env.local` from `.env.example`, or use the included recovery scripts:
+
+```sh
+npm run supabase:create-project -- --name your-new-project --db-pass your-db-password --org your-org-slug
+npm run supabase:restore-backup -- path/to/your-backup.backup.gz
+```
+
+The detailed recovery workflow is documented in [docs/supabase-recovery.md](./docs/supabase-recovery.md).
