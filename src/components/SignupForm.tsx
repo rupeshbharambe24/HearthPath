@@ -62,7 +62,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, onSwitchToLogin }) =>
             <span className="text-2xl">💖</span>
           </div>
           <CardTitle className="text-2xl font-bold bg-gradient-to-r from-romantic-red to-romantic-pink bg-clip-text text-transparent">
-            Join CampusHeart
+            Join HeartPath
           </CardTitle>
           <CardDescription>
             Create your account to start connecting

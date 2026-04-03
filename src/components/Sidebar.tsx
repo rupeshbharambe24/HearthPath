@@ -39,7 +39,7 @@ const Sidebar = () => {
               <Heart className="w-4 h-4 text-white" />
             </div>
             <span className="text-xl font-bold bg-gradient-to-r from-romantic-red to-romantic-pink bg-clip-text text-transparent">
-              CampusHeart
+              HeartPath
             </span>
           </div>
         </div>

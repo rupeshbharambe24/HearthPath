@@ -152,7 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await loadUserProfile(data.user);
         toast({
           title: "Welcome back! 💖",
-          description: "You've successfully signed in to CampusHeart.",
+          description: "You've successfully signed in to HeartPath.",
         });
       }
     } catch (error: any) {

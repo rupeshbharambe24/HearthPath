@@ -40,7 +40,7 @@ $env:SUPABASE_ORG_SLUG="your-org-slug"
 Create the project:
 
 ```powershell
-npm run supabase:create-project -- --name heart-surface-connect-recovery --db-pass "choose-a-strong-db-password"
+npm run supabase:create-project -- --name heartpath-recovery --db-pass "choose-a-strong-db-password"
 ```
 
 Optional flags:

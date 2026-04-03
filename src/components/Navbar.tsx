@@ -16,7 +16,7 @@ const Navbar = () => {
                 <span className="text-white font-bold text-lg">💖</span>
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-romantic-red to-romantic-pink bg-clip-text text-transparent">
-                CollegeLoveLink
+                HeartPath
               </span>
             </div>
           </div>

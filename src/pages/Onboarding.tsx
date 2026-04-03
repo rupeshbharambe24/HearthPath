@@ -224,7 +224,7 @@ const Onboarding = () => {
       console.log('Profile updated successfully:', data);
 
       toast({
-        title: "Welcome to CampusHeart! 💖",
+        title: "Welcome to HeartPath! 💖",
         description: photoUrl 
           ? "Your profile has been set up successfully with your photo!"
           : "Your profile has been set up successfully!",
@@ -278,7 +278,7 @@ const Onboarding = () => {
               Complete Your Profile
             </CardTitle>
             <CardDescription>
-              Let's set up your CampusHeart profile to help you find meaningful connections
+              Let's set up your HeartPath profile to help you build meaningful, trust-first connections
             </CardDescription>
           </CardHeader>
           <CardContent>
