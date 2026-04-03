@@ -60,56 +60,14 @@ const Onboarding = () => {
     reader.readAsDataURL(file);
   };
 
-  const createBucketIfNotExists = async () => {
-    try {
-      console.log('Checking if profile-photos bucket exists...');
-      
-      // First, try to list buckets to see if profile-photos exists
-      const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-      
-      if (listError) {
-        console.error('Error listing buckets:', listError);
-        throw new Error('Unable to access storage');
-      }
-      
-      console.log('Available buckets:', buckets);
-      
-      const profilePhotosBucket = buckets.find(bucket => bucket.id === 'profile-photos');
-      
-      if (!profilePhotosBucket) {
-        console.log('profile-photos bucket not found, attempting to create...');
-        
-        // Try to create the bucket
-        const { data: createData, error: createError } = await supabase.storage.createBucket('profile-photos', {
-          public: true,
-          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/jpg'],
-          fileSizeLimit: 5242880 // 5MB
-        });
-        
-        if (createError) {
-          console.error('Error creating bucket:', createError);
-          throw new Error(`Failed to create storage bucket: ${createError.message}`);
-        }
-        
-        console.log('Successfully created profile-photos bucket:', createData);
-        return true;
-      }
-      
-      console.log('profile-photos bucket already exists');
-      return true;
-    } catch (error) {
-      console.error('Error in createBucketIfNotExists:', error);
-      throw error;
-    }
-  };
-
   const uploadPhoto = async (file: File): Promise<string | null> => {
     try {
       console.log('Starting photo upload...');
       setUploadStatus('uploading');
-      
-      // First ensure the bucket exists
-      await createBucketIfNotExists();
+
+      if (!user?.id) {
+        throw new Error('You must be signed in before uploading a profile photo.');
+      }
       
       const fileExt = file.name.split('.').pop();
       const fileName = `${user?.id}/level_1.${fileExt}`;
@@ -125,6 +83,10 @@ const Onboarding = () => {
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
+        if (uploadError.message?.toLowerCase().includes('bucket') && uploadError.message?.toLowerCase().includes('not found')) {
+          throw new Error('Profile photo storage is not configured yet. Apply the Supabase storage migration and try again.');
+        }
+
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
