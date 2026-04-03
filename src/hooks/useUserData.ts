@@ -1,30 +1,15 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import type { Tables } from '@/integrations/supabase/types';
 
-interface UserProfile {
-  id: string;
-  name: string;
-  college_name: string | null;
-  branch: string | null;
-  year: number | null;
-  about: string | null;
-  hobbies: string[] | null;
-  photo_levels: any;
+type UserProfile = Tables<'users'>;
+
+interface UserRelationship extends Tables<'relationships'> {
+  partner: UserProfile | null;
 }
 
-interface UserRelationship {
-  id: string;
-  user_a: string;
-  user_b: string;
-  current_level: number;
-  hearts_a2b: number;
-  hearts_b2a: number;
-  trust_score: number;
-  status: string;
-  partner: UserProfile;
-}
+const ACTIVE_RELATIONSHIP_STATES = ['active', 'exclusive', 'paused'] as const;
 
 export const useUserData = () => {
   const { user } = useAuth();
@@ -39,8 +24,7 @@ export const useUserData = () => {
     const fetchUserData = async () => {
       try {
         setLoading(true);
-        
-        // Fetch user profile
+
         const { data: profileData, error: profileError } = await supabase
           .from('users')
           .select('*')
@@ -48,51 +32,55 @@ export const useUserData = () => {
           .single();
 
         if (profileError) {
-          console.error('Error fetching profile:', profileError);
-          setError('Failed to load profile');
-          return;
+          throw profileError;
         }
 
         setProfile(profileData);
 
-        // Fetch relationships with partner details
-        const { data: relationshipsData, error: relationshipsError } = await supabase
+        const { data: relationshipRows, error: relationshipError } = await supabase
           .from('relationships')
-          .select(`
-            *,
-            partner:users!relationships_user_b_fkey(*)
-          `)
+          .select('*')
           .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
-          .eq('status', 'active');
+          .in('lifecycle_state', [...ACTIVE_RELATIONSHIP_STATES]);
 
-        if (relationshipsError) {
-          console.error('Error fetching relationships:', relationshipsError);
-        } else {
-          // Process relationships to get correct partner data
-          const processedRelationships = relationshipsData?.map(rel => {
-            const isUserA = rel.user_a === user.id;
-            const partnerId = isUserA ? rel.user_b : rel.user_a;
-            
-            return {
-              ...rel,
-              partner: rel.partner || { 
-                id: partnerId, 
-                name: 'Unknown User',
-                college_name: null,
-                branch: null,
-                year: null,
-                about: null,
-                hobbies: null,
-                photo_levels: null
-              }
-            };
-          }) || [];
-
-          setRelationships(processedRelationships);
+        if (relationshipError) {
+          throw relationshipError;
         }
 
-      } catch (err) {
-        console.error('Error in fetchUserData:', err);
+        const partnerIds = Array.from(
+          new Set(
+            (relationshipRows || [])
+              .map((relationship) => (relationship.user_a === user.id ? relationship.user_b : relationship.user_a))
+              .filter(Boolean) as string[]
+          )
+        );
+
+        let partnerMap = new Map<string, UserProfile>();
+        if (partnerIds.length > 0) {
+          const { data: partnerRows, error: partnerError } = await supabase
+            .from('users')
+            .select('*')
+            .in('id', partnerIds);
+
+          if (partnerError) {
+            throw partnerError;
+          }
+
+          partnerMap = new Map((partnerRows || []).map((partner) => [partner.id, partner]));
+        }
+
+        const processedRelationships = (relationshipRows || []).map((relationship) => {
+          const partnerId = relationship.user_a === user.id ? relationship.user_b : relationship.user_a;
+          return {
+            ...relationship,
+            partner: partnerId ? partnerMap.get(partnerId) || null : null,
+          };
+        });
+
+        setRelationships(processedRelationships);
+        setError(null);
+      } catch (fetchError) {
+        console.error('Error loading user data:', fetchError);
         setError('Failed to load user data');
       } finally {
         setLoading(false);

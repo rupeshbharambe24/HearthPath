@@ -2,6 +2,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { getStageName } from '@/lib/heartpath';
 
 interface LevelTagBadgeProps {
   level: number;
@@ -22,7 +23,7 @@ const LevelTagBadge: React.FC<LevelTagBadgeProps> = ({ level }) => {
 
   return (
     <Badge className={cn('text-xs font-medium', getLevelColor(level))}>
-      Level {level}
+      Level {level}: {getStageName(level)}
     </Badge>
   );
 };

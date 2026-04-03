@@ -1,29 +1,29 @@
-
 import React from 'react';
 import AppLayout from '@/components/AppLayout';
 import Sidebar from '@/components/Sidebar';
 import ProfileCard from '@/components/ProfileCard';
 import { useToast } from '@/hooks/use-toast';
 import { useExploreData } from '@/hooks/useExploreData';
+import { buildVisibleProfile } from '@/lib/heartpath';
 
 const Explore = () => {
   const { toast } = useToast();
-  const { profiles, loading, error, sendChatRequest } = useExploreData();
+  const { profiles, loading, error, discoveryLocked, sendChatRequest } = useExploreData();
 
   const handleSendChatRequest = async (profileId: string) => {
-    const profile = profiles.find(p => p.id === profileId);
+    const profile = profiles.find((candidate) => candidate.id === profileId);
     const result = await sendChatRequest(profileId);
-    
+
     if (result.success) {
       toast({
-        title: "Chat Request Sent! 💕",
-        description: `Your chat request has been sent to ${profile?.name}. They'll be notified soon!`,
+        title: 'HeartPath invitation sent',
+        description: `Your request has been sent to ${profile?.name}. The path begins only if they accept it too.`,
       });
     } else {
       toast({
-        title: "Failed to Send Request",
-        description: result.error || "Please try again later.",
-        variant: "destructive",
+        title: 'Failed to send request',
+        description: result.error || 'Please try again later.',
+        variant: 'destructive',
       });
     }
   };
@@ -36,10 +36,10 @@ const Explore = () => {
           <main className="flex-1 lg:ml-64 p-6">
             <div className="max-w-7xl mx-auto">
               <div className="animate-pulse space-y-8">
-                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[1,2,3,4,5,6].map(i => (
-                    <div key={i} className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  {[1, 2, 3, 4, 5, 6].map((item) => (
+                    <div key={item} className="h-64 bg-gray-200 dark:bg-gray-700 rounded" />
                   ))}
                 </div>
               </div>
@@ -74,45 +74,57 @@ const Explore = () => {
         <main className="flex-1 lg:ml-64 p-6">
           <div className="max-w-7xl mx-auto">
             <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                Explore Hearts
-              </h1>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Explore HeartPath</h1>
               <p className="text-gray-600 dark:text-gray-400">
-                Discover meaningful connections with fellow students.
+                Discover people gently. HeartPath opens deeper layers only when both people are ready.
               </p>
             </div>
-            
-            {profiles.length === 0 ? (
+
+            {discoveryLocked ? (
               <div className="text-center p-8 bg-white dark:bg-romantic-dark-card rounded-lg shadow-sm">
                 <div className="w-16 h-16 mx-auto mb-4 bg-romantic-light-pink dark:bg-romantic-red/20 rounded-full flex items-center justify-center">
-                  <span className="text-2xl">💝</span>
+                  <span className="text-sm font-semibold text-romantic-red">Lock</span>
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                  No New Profiles
-                </h3>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Discovery Locked</h3>
                 <p className="text-gray-500 dark:text-gray-400">
-                  You've seen all available profiles! Check back later for new connections.
+                  You are already in an exclusive HeartPath. New discovery becomes available again only if that
+                  relationship leaves exclusivity.
+                </p>
+              </div>
+            ) : profiles.length === 0 ? (
+              <div className="text-center p-8 bg-white dark:bg-romantic-dark-card rounded-lg shadow-sm">
+                <div className="w-16 h-16 mx-auto mb-4 bg-romantic-light-pink dark:bg-romantic-red/20 rounded-full flex items-center justify-center">
+                  <span className="text-sm font-semibold text-romantic-red">Open</span>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No New Profiles</h3>
+                <p className="text-gray-500 dark:text-gray-400">
+                  You&apos;ve already seen the currently available profiles. Check back later for new connections.
                 </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {profiles.map((profile) => (
-                  <ProfileCard
-                    key={profile.id}
-                    profile={{
-                      id: profile.id,
-                      name: profile.name,
-                      college: profile.college_name || 'Unknown College',
-                      branch: profile.branch || 'Unknown Branch',
-                      year: profile.year || 1,
-                      hobbies: profile.hobbies || [],
-                      interests: [], // Could be added to schema later
-                      description: profile.about || 'No description available',
-                      relationshipLevel: 1, // Start at level 1 for new connections
-                    }}
-                    onSendChatRequest={handleSendChatRequest}
-                  />
-                ))}
+                {profiles.map((profile) => {
+                  const visibleProfile = buildVisibleProfile(profile, 1, []);
+
+                  return (
+                    <ProfileCard
+                      key={profile.id}
+                      profile={{
+                        id: profile.id,
+                        name: visibleProfile.name,
+                        college: visibleProfile.college,
+                        branch: visibleProfile.branch,
+                        year: visibleProfile.year,
+                        hobbies: visibleProfile.hobbies,
+                        description: visibleProfile.about,
+                        relationshipLevel: 1,
+                        photoUrl: visibleProfile.levelOnePhoto || visibleProfile.fullFacePhoto,
+                        galleryCount: visibleProfile.privateGallery.length,
+                      }}
+                      onSendChatRequest={handleSendChatRequest}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>

@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { Navigate } from 'react-router-dom';
 import AppLayout from '@/components/AppLayout';
 import Sidebar from '@/components/Sidebar';
 import DashboardStats from '@/components/DashboardStats';
@@ -32,6 +33,9 @@ const Dashboard = () => {
     );
   }
 
+  if (stats.primaryLifecycleState === 'exclusive') {
+    return <Navigate to="/interactive" replace />;
+  }
 
   return (
     <AppLayout>
@@ -44,7 +48,7 @@ const Dashboard = () => {
                 Welcome back, {user?.name || 'User'}!
               </h1>
               <p className="text-gray-600 dark:text-gray-400">
-                Here's your romantic journey overview.
+                Here is your HeartPath relationship overview.
               </p>
             </div>
             

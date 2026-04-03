@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import type { Tables } from '@/integrations/supabase/types';
 
 interface DashboardStats {
   currentLevel: number;
@@ -16,6 +17,23 @@ interface DashboardStats {
     college: string;
     level: number;
   }>;
+  primaryLifecycleState: string | null;
+}
+
+type RelationshipRow = Tables<'relationships'>;
+type UserRow = Tables<'users'>;
+
+const ACTIVE_RELATIONSHIP_STATES = ['active', 'exclusive', 'paused'] as const;
+
+function pickPrimaryRelationship(relationships: RelationshipRow[]) {
+  const priority = ['exclusive', 'active', 'paused'] as const;
+
+  for (const state of priority) {
+    const found = relationships.find((relationship) => relationship.lifecycle_state === state);
+    if (found) return found;
+  }
+
+  return null;
 }
 
 export const useDashboardData = () => {
@@ -29,6 +47,7 @@ export const useDashboardData = () => {
     totalMemories: 0,
     lastInteraction: null,
     recentMatches: [],
+    primaryLifecycleState: null,
   });
   const [loading, setLoading] = useState(true);
 
@@ -44,67 +63,96 @@ export const useDashboardData = () => {
     try {
       setLoading(true);
 
-      // Fetch relationships
-      const { data: relationships, error: relationshipsError } = await supabase
+      const { data: relationshipRows, error: relationshipError } = await supabase
         .from('relationships')
-        .select(`
-          *,
-          partner:users!relationships_user_b_fkey(name, college_name)
-        `)
+        .select('*')
         .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
-        .eq('status', 'active');
+        .in('lifecycle_state', [...ACTIVE_RELATIONSHIP_STATES]);
 
-      if (relationshipsError) {
-        console.error('Error fetching relationships:', relationshipsError);
+      if (relationshipError) {
+        throw relationshipError;
       }
 
-      // Fetch memories count
+      const partnerIds = Array.from(
+        new Set(
+          (relationshipRows || [])
+            .map((relationship) => (relationship.user_a === user.id ? relationship.user_b : relationship.user_a))
+            .filter(Boolean) as string[]
+        )
+      );
+
+      let partnerMap = new Map<string, UserRow>();
+      if (partnerIds.length > 0) {
+        const { data: partnerRows, error: partnerError } = await supabase
+          .from('users')
+          .select('id, name, college_name')
+          .in('id', partnerIds);
+
+        if (partnerError) {
+          throw partnerError;
+        }
+
+        partnerMap = new Map((partnerRows || []).map((partner) => [partner.id, partner]));
+      }
+
       const { count: memoriesCount, error: memoriesError } = await supabase
         .from('memories')
         .select('*', { count: 'exact', head: true })
         .eq('created_by', user.id);
 
       if (memoriesError) {
-        console.error('Error fetching memories:', memoriesError);
+        throw memoriesError;
       }
 
-      // Fetch latest message for last interaction
       const { data: lastMessage, error: messageError } = await supabase
         .from('messages')
         .select('created_at')
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (messageError && messageError.code !== 'PGRST116') {
-        console.error('Error fetching last message:', messageError);
+      if (messageError) {
+        throw messageError;
       }
 
-      // Calculate stats
-      const relationshipData = relationships || [];
-      const currentLevel = relationshipData.length > 0 
-        ? Math.max(...relationshipData.map(r => r.current_level || 1))
-        : 1;
+      const relationshipData = relationshipRows || [];
+      const primaryRelationship = pickPrimaryRelationship(relationshipData);
 
-      const trustScore = relationshipData.length > 0
-        ? Math.round(relationshipData.reduce((sum, r) => sum + (r.trust_score || 0), 0) / relationshipData.length)
-        : 75;
+      const currentLevel =
+        primaryRelationship?.current_stage ||
+        primaryRelationship?.current_level ||
+        (relationshipData.length > 0
+          ? Math.max(...relationshipData.map((relationship) => relationship.current_stage || relationship.current_level || 1))
+          : 1);
 
-      const heartsGiven = relationshipData.reduce((sum, r) => {
-        return sum + (r.user_a === user.id ? (r.hearts_a2b || 0) : (r.hearts_b2a || 0));
+      const trustScore =
+        relationshipData.length > 0
+          ? Math.round(
+              relationshipData.reduce((sum, relationship) => sum + (relationship.trust_score || 0), 0) /
+                relationshipData.length
+            )
+          : 75;
+
+      const heartsGiven = relationshipData.reduce((sum, relationship) => {
+        return sum + (relationship.user_a === user.id ? relationship.hearts_a2b || 0 : relationship.hearts_b2a || 0);
       }, 0);
 
-      const heartsReceived = relationshipData.reduce((sum, r) => {
-        return sum + (r.user_a === user.id ? (r.hearts_b2a || 0) : (r.hearts_a2b || 0));
+      const heartsReceived = relationshipData.reduce((sum, relationship) => {
+        return sum + (relationship.user_a === user.id ? relationship.hearts_b2a || 0 : relationship.hearts_a2b || 0);
       }, 0);
 
-      const recentMatches = relationshipData.slice(0, 3).map(rel => ({
-        id: rel.id,
-        name: rel.partner?.name || 'Unknown User',
-        college: rel.partner?.college_name || 'Unknown College',
-        level: rel.current_level || 1,
-      }));
+      const recentMatches = relationshipData.slice(0, 3).map((relationship) => {
+        const partnerId = relationship.user_a === user.id ? relationship.user_b : relationship.user_a;
+        const partner = partnerId ? partnerMap.get(partnerId) : null;
+
+        return {
+          id: relationship.id,
+          name: partner?.name || 'Unknown User',
+          college: partner?.college_name || 'Unknown College',
+          level: relationship.current_stage || relationship.current_level || 1,
+        };
+      });
 
       setStats({
         currentLevel,
@@ -115,8 +163,8 @@ export const useDashboardData = () => {
         totalMemories: memoriesCount || 0,
         lastInteraction: lastMessage?.created_at || null,
         recentMatches,
+        primaryLifecycleState: primaryRelationship?.lifecycle_state || null,
       });
-
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {

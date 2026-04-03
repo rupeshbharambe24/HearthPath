@@ -35,6 +35,63 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_summaries: {
+        Row: {
+          consent_scope: string | null
+          created_at: string
+          generated_by: string
+          id: string
+          metadata: Json
+          relationship_id: string
+          source_scope: string
+          summary: string
+          summary_kind: string
+          title: string
+          visibility: string
+        }
+        Insert: {
+          consent_scope?: string | null
+          created_at?: string
+          generated_by: string
+          id?: string
+          metadata?: Json
+          relationship_id: string
+          source_scope: string
+          summary: string
+          summary_kind: string
+          title: string
+          visibility: string
+        }
+        Update: {
+          consent_scope?: string | null
+          created_at?: string
+          generated_by?: string
+          id?: string
+          metadata?: Json
+          relationship_id?: string
+          source_scope?: string
+          summary?: string
+          summary_kind?: string
+          title?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_summaries_generated_by_fkey"
+            columns: ["generated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_summaries_relationship_id_fkey"
+            columns: ["relationship_id"]
+            isOneToOne: false
+            referencedRelation: "relationships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fun_posts: {
         Row: {
           correct_answer: string | null
@@ -88,28 +145,52 @@ export type Database = {
       }
       memories: {
         Row: {
+          archived_at: string | null
+          attachment_type: string | null
+          attachment_url: string | null
           created_at: string | null
           created_by: string | null
+          entry_type: string | null
           id: string
           level_at: number | null
           memo_text: string | null
+          mood: string | null
+          reflection_follow_up: string | null
           relationship_id: string | null
+          tags: string[] | null
+          visibility: string | null
         }
         Insert: {
+          archived_at?: string | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           created_at?: string | null
           created_by?: string | null
+          entry_type?: string | null
           id?: string
           level_at?: number | null
           memo_text?: string | null
+          mood?: string | null
+          reflection_follow_up?: string | null
           relationship_id?: string | null
+          tags?: string[] | null
+          visibility?: string | null
         }
         Update: {
+          archived_at?: string | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           created_at?: string | null
           created_by?: string | null
+          entry_type?: string | null
           id?: string
           level_at?: number | null
           memo_text?: string | null
+          mood?: string | null
+          reflection_follow_up?: string | null
           relationship_id?: string | null
+          tags?: string[] | null
+          visibility?: string | null
         }
         Relationships: [
           {
@@ -170,13 +251,80 @@ export type Database = {
           },
         ]
       }
+      relationship_permissions: {
+        Row: {
+          created_at: string
+          granted_at: string
+          granted_by: string
+          granted_to: string
+          id: string
+          permission: string
+          relationship_id: string
+          revoked_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          granted_at?: string
+          granted_by: string
+          granted_to: string
+          id?: string
+          permission: string
+          relationship_id: string
+          revoked_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          granted_at?: string
+          granted_by?: string
+          granted_to?: string
+          id?: string
+          permission?: string
+          relationship_id?: string
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relationship_permissions_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "relationship_permissions_granted_to_fkey"
+            columns: ["granted_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "relationship_permissions_relationship_id_fkey"
+            columns: ["relationship_id"]
+            isOneToOne: false
+            referencedRelation: "relationships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       relationships: {
         Row: {
+          agreements_summary: string | null
+          archived_at: string | null
+          boundary_topics: string[] | null
           cooldown_until: string | null
           current_level: number | null
+          current_stage: number | null
+          exclusive_locked_at: string | null
           hearts_a2b: number | null
           hearts_b2a: number | null
           id: string
+          lifecycle_state: string | null
+          pace_preference: string | null
+          paused_at: string | null
+          requested_stage: number | null
+          stage_request_cooldown_until: string | null
+          stage_request_from_user_id: string | null
+          stage_request_status: string | null
           status: string | null
           trust_score: number | null
           updated_at: string | null
@@ -184,11 +332,23 @@ export type Database = {
           user_b: string | null
         }
         Insert: {
+          agreements_summary?: string | null
+          archived_at?: string | null
+          boundary_topics?: string[] | null
           cooldown_until?: string | null
           current_level?: number | null
+          current_stage?: number | null
+          exclusive_locked_at?: string | null
           hearts_a2b?: number | null
           hearts_b2a?: number | null
           id?: string
+          lifecycle_state?: string | null
+          pace_preference?: string | null
+          paused_at?: string | null
+          requested_stage?: number | null
+          stage_request_cooldown_until?: string | null
+          stage_request_from_user_id?: string | null
+          stage_request_status?: string | null
           status?: string | null
           trust_score?: number | null
           updated_at?: string | null
@@ -196,11 +356,23 @@ export type Database = {
           user_b?: string | null
         }
         Update: {
+          agreements_summary?: string | null
+          archived_at?: string | null
+          boundary_topics?: string[] | null
           cooldown_until?: string | null
           current_level?: number | null
+          current_stage?: number | null
+          exclusive_locked_at?: string | null
           hearts_a2b?: number | null
           hearts_b2a?: number | null
           id?: string
+          lifecycle_state?: string | null
+          pace_preference?: string | null
+          paused_at?: string | null
+          requested_stage?: number | null
+          stage_request_cooldown_until?: string | null
+          stage_request_from_user_id?: string | null
+          stage_request_status?: string | null
           status?: string | null
           trust_score?: number | null
           updated_at?: string | null
@@ -218,6 +390,57 @@ export type Database = {
           {
             foreignKeyName: "relationships_user_b_fkey"
             columns: ["user_b"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weekly_checkins: {
+        Row: {
+          created_at: string
+          gratitude_note: string | null
+          id: string
+          relationship_id: string
+          relationship_note: string | null
+          relationship_rating: number
+          user_id: string
+          visibility: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          gratitude_note?: string | null
+          id?: string
+          relationship_id: string
+          relationship_note?: string | null
+          relationship_rating: number
+          user_id: string
+          visibility?: string
+          week_start: string
+        }
+        Update: {
+          created_at?: string
+          gratitude_note?: string | null
+          id?: string
+          relationship_id?: string
+          relationship_note?: string | null
+          relationship_rating?: number
+          user_id?: string
+          visibility?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_checkins_relationship_id_fkey"
+            columns: ["relationship_id"]
+            isOneToOne: false
+            referencedRelation: "relationships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_checkins_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]

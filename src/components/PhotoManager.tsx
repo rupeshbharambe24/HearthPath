@@ -5,6 +5,7 @@ import { Upload, Camera, Eye, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { normalizePhotoLevels } from '@/lib/heartpath';
 
 interface PhotoSlot {
   level: number;
@@ -35,6 +36,13 @@ const PhotoManager = () => {
     if (!user?.id) return;
 
     try {
+      const { data: userRow } = await supabase
+        .from('users')
+        .select('photo_levels')
+        .eq('id', user.id)
+        .single();
+
+      const existingPhotoLevels = normalizePhotoLevels(userRow?.photo_levels);
       const updatedSlots = await Promise.all(
         photoSlots.map(async (slot) => {
           const { data } = await supabase.storage
@@ -48,8 +56,15 @@ const PhotoManager = () => {
 
             return {
               ...slot,
-              image: urlData.publicUrl,
+              image: urlData.publicUrl || existingPhotoLevels[`level_${slot.level}`],
               uploaded: true
+            };
+          }
+          if (existingPhotoLevels[`level_${slot.level}`]) {
+            return {
+              ...slot,
+              image: existingPhotoLevels[`level_${slot.level}`],
+              uploaded: true,
             };
           }
           return slot;
@@ -116,22 +131,24 @@ const PhotoManager = () => {
           .getPublicUrl(filePath);
 
         // Update photo slots
-        setPhotoSlots(prev => prev.map(slot => 
-          slot.level === level 
+        const nextSlots = photoSlots.map((slot) =>
+          slot.level === level
             ? { ...slot, image: urlData.publicUrl, uploaded: true }
             : slot
-        ));
+        );
+        setPhotoSlots(nextSlots);
 
         // Update user's photo_levels in database
         const { error: dbError } = await supabase
           .from('users')
           .update({
             photo_levels: {
-              ...photoSlots.reduce((acc, slot) => ({
-                ...acc,
-                [slot.level]: slot.uploaded || slot.level === level
-              }), {}),
-              [level]: true
+              ...nextSlots.reduce<Record<string, string>>((acc, slot) => {
+                if (slot.image) {
+                  acc[`level_${slot.level}`] = slot.image;
+                }
+                return acc;
+              }, {}),
             }
           })
           .eq('id', user.id);

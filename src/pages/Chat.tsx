@@ -19,7 +19,7 @@ const Chat = () => {
     : null;
 
   const selectedPartnerName = selectedPartner?.partner?.name || 'Chat';
-  const selectedRelationshipLevel = selectedPartner?.current_level || 1;
+  const selectedRelationshipLevel = selectedPartner?.current_stage || selectedPartner?.current_level || 1;
 
   return (
     <AppLayout>
