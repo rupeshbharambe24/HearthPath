@@ -26,7 +26,7 @@ const Onboarding = () => {
   const [photoPreview, setPhotoPreview] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -192,7 +192,7 @@ const Onboarding = () => {
           : "Your profile has been set up successfully!",
       });
 
-      // Navigate to dashboard
+      await refreshUser();
       navigate('/dashboard');
     } catch (error: any) {
       console.error('Error in handleSubmit:', error);

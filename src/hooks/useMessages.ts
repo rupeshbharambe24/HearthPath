@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,126 +25,108 @@ export const useMessages = () => {
   const [chatPreviews, setChatPreviews] = useState<ChatPreview[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!user?.id) return;
+  const fetchMessages = async (showLoader = true) => {
+    if (!user?.id) {
+      setMessages([]);
+      setChatPreviews([]);
+      setLoading(false);
+      return;
+    }
 
-    const fetchMessages = async () => {
-      try {
-        setLoading(true);
+    try {
+      if (showLoader) setLoading(true);
 
-        // Get all messages for the current user
-        const { data: messagesData, error: messagesError } = await supabase
-          .from('messages')
-          .select('*')
-          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-          .order('created_at', { ascending: true });
+      const { data: messageRows, error: messageError } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: true });
 
-        if (messagesError) {
-          console.error('Error fetching messages:', messagesError);
-          return;
-        }
+      if (messageError) throw messageError;
 
-        setMessages(messagesData || []);
+      const nextMessages = messageRows || [];
+      setMessages(nextMessages);
 
-        // Generate chat previews
-        const chatMap = new Map<string, ChatPreview>();
-        
-        for (const message of messagesData || []) {
-          const partnerId = message.sender_id === user.id ? message.receiver_id : message.sender_id;
-          
-          if (!chatMap.has(partnerId)) {
-            // Get partner name
-            const { data: partnerData } = await supabase
-              .from('users')
-              .select('name')
-              .eq('id', partnerId)
-              .single();
+      const partnerIds = Array.from(
+        new Set(
+          nextMessages
+            .map((message) => (message.sender_id === user.id ? message.receiver_id : message.sender_id))
+            .filter(Boolean)
+        )
+      );
 
-            chatMap.set(partnerId, {
-              partnerId,
-              partnerName: partnerData?.name || 'Unknown User',
-              lastMessage: message.content || '',
-              lastMessageTime: message.created_at,
-              unreadCount: 0
-            });
-          } else {
-            // Update with latest message
-            const existing = chatMap.get(partnerId)!;
-            if (new Date(message.created_at) > new Date(existing.lastMessageTime)) {
-              existing.lastMessage = message.content || '';
-              existing.lastMessageTime = message.created_at;
-            }
-          }
-        }
+      let partnerMap = new Map<string, string>();
+      if (partnerIds.length > 0) {
+        const { data: userRows, error: userError } = await supabase
+          .from('users')
+          .select('id, name')
+          .in('id', partnerIds);
 
-        setChatPreviews(Array.from(chatMap.values()).sort((a, b) => 
-          new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
-        ));
-
-      } catch (err) {
-        console.error('Error fetching messages:', err);
-      } finally {
-        setLoading(false);
+        if (userError) throw userError;
+        partnerMap = new Map((userRows || []).map((partner) => [partner.id, partner.name]));
       }
-    };
 
-    fetchMessages();
+      const previewMap = new Map<string, ChatPreview>();
+      for (const message of nextMessages) {
+        const partnerId = message.sender_id === user.id ? message.receiver_id : message.sender_id;
+        const currentPreview = previewMap.get(partnerId);
 
-    // Set up real-time subscription for messages with error handling
-    let messagesChannel: any = null;
-    
-    const setupRealtimeSubscription = () => {
-      try {
-        messagesChannel = supabase
-          .channel(`messages-realtime-${user.id}`)
-          .on('postgres_changes', {
-            event: '*',
-            schema: 'public',
-            table: 'messages',
-            filter: `sender_id=eq.${user.id}`
-          }, (payload) => {
-            console.log('Real-time message update:', payload);
-            setTimeout(() => fetchMessages(), 100);
-          })
-          .on('postgres_changes', {
-            event: '*',
-            schema: 'public',
-            table: 'messages',
-            filter: `receiver_id=eq.${user.id}`
-          }, (payload) => {
-            console.log('Real-time message update:', payload);
-            setTimeout(() => fetchMessages(), 100);
-          })
-          .subscribe((status) => {
-            if (status !== 'SUBSCRIBED') {
-              console.log('Messages realtime subscription status:', status);
-              if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-                setTimeout(setupRealtimeSubscription, 5000);
-              }
-            }
+        if (!currentPreview || new Date(message.created_at) > new Date(currentPreview.lastMessageTime)) {
+          previewMap.set(partnerId, {
+            partnerId,
+            partnerName: partnerMap.get(partnerId) || 'Unknown User',
+            lastMessage: message.content || '',
+            lastMessageTime: message.created_at,
+            unreadCount: 0,
           });
-      } catch (error) {
-        console.error('Error setting up messages realtime subscription:', error);
+        }
       }
-    };
 
-    // Delay initial subscription to avoid connection issues
-    const subscriptionTimeout = setTimeout(setupRealtimeSubscription, 2000);
+      setChatPreviews(
+        Array.from(previewMap.values()).sort(
+          (left, right) => new Date(right.lastMessageTime).getTime() - new Date(left.lastMessageTime).getTime()
+        )
+      );
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
+    fetchMessages(true);
+
+    const channel = supabase
+      .channel(`messages-realtime-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages', filter: `sender_id=eq.${user.id}` },
+        () => void fetchMessages(false)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` },
+        () => void fetchMessages(false)
+      )
+      .subscribe();
 
     return () => {
-      clearTimeout(subscriptionTimeout);
-      if (messagesChannel) {
-        messagesChannel.unsubscribe();
-      }
+      supabase.removeChannel(channel);
     };
   }, [user?.id]);
 
-  const getMessagesWithPartner = (partnerId: string) => {
-    return messages.filter(msg => 
-      (msg.sender_id === user?.id && msg.receiver_id === partnerId) ||
-      (msg.sender_id === partnerId && msg.receiver_id === user?.id)
+  const getMessagesWithPartner = (partnerId: string) =>
+    messages.filter(
+      (message) =>
+        (message.sender_id === user?.id && message.receiver_id === partnerId) ||
+        (message.sender_id === partnerId && message.receiver_id === user?.id)
     );
-  };
 
   return { messages, chatPreviews, loading, getMessagesWithPartner };
 };

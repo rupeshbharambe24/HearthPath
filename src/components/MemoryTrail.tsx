@@ -68,9 +68,9 @@ const MemoryTrail: React.FC<MemoryTrailProps> = ({
   useEffect(() => {
     if (!user?.id || (!partnerId && !relationshipId)) return;
 
-    const fetchMemories = async () => {
+    const fetchMemories = async (showLoader = true) => {
       try {
-        setLoading(true);
+        if (showLoader) setLoading(true);
 
         let activeRelationshipId = relationshipId || null;
 
@@ -114,11 +114,11 @@ const MemoryTrail: React.FC<MemoryTrailProps> = ({
       }
     };
 
-    fetchMemories();
+    fetchMemories(true);
 
     const channel = supabase
       .channel(`memories-${partnerId || relationshipId || 'shared'}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'memories' }, fetchMemories)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'memories' }, () => void fetchMemories(false))
       .subscribe();
 
     return () => {

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ProtectedRouteProps {
@@ -8,6 +8,7 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const location = useLocation();
   const { isAuthenticated, isLoading, user } = useAuth();
 
   // Show loading while auth state is being determined
@@ -25,12 +26,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   // Redirect to onboarding if user needs onboarding
-  if (user?.needsOnboarding && window.location.pathname !== '/onboarding') {
+  if (user?.needsOnboarding && location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />;
   }
 
   // Redirect to dashboard if user completed onboarding but is on onboarding page
-  if (!user?.needsOnboarding && window.location.pathname === '/onboarding') {
+  if (!user?.needsOnboarding && location.pathname === '/onboarding') {
     return <Navigate to="/dashboard" replace />;
   }
 

@@ -54,11 +54,22 @@ export const useRelationshipSpaceData = () => {
   const [aiSummaries, setAiSummaries] = useState<SummaryRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
-    if (!user?.id) return;
+  const fetchData = async (showLoader = true) => {
+    if (!user?.id) {
+      setRelationships([]);
+      setIncomingRequests([]);
+      setOutgoingRequests([]);
+      setPrimaryRelationship(null);
+      setPermissions([]);
+      setMemories([]);
+      setCheckins([]);
+      setAiSummaries([]);
+      setLoading(false);
+      return;
+    }
 
     try {
-      setLoading(true);
+      if (showLoader) setLoading(true);
 
       const { data: relationshipRows, error: relationshipError } = await supabase
         .from('relationships')
@@ -161,17 +172,20 @@ export const useRelationshipSpaceData = () => {
   };
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
 
-    fetchData();
+    fetchData(true);
 
     const channel = supabase
       .channel(`heartpath-space-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'relationships' }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'relationship_permissions' }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'weekly_checkins' }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_summaries' }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'memories' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'relationships' }, () => void fetchData(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'relationship_permissions' }, () => void fetchData(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'weekly_checkins' }, () => void fetchData(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_summaries' }, () => void fetchData(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'memories' }, () => void fetchData(false))
       .subscribe();
 
     return () => {
