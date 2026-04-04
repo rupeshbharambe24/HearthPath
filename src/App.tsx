@@ -10,6 +10,7 @@ import NotFound from "./pages/NotFound";
 import MobileNav from "./components/MobileNav";
 import ProtectedRoute from "./components/ProtectedRoute";
 import FullscreenLoader from "./components/FullscreenLoader";
+import AppErrorBoundary from "./components/AppErrorBoundary";
 
 const Index = lazy(() => import("./pages/Index"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
@@ -20,7 +21,17 @@ const Settings = lazy(() => import("./pages/Settings"));
 const MyProfile = lazy(() => import("./pages/MyProfile"));
 const Interactive = lazy(() => import("./pages/Interactive"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -30,8 +41,9 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Suspense fallback={<FullscreenLoader label="Loading page..." />}>
-              <Routes>
+            <AppErrorBoundary>
+              <Suspense fallback={<FullscreenLoader label="Loading page..." />}>
+                <Routes>
                 <Route path="/" element={<Index />} />
                 <Route
                   path="/onboarding"
@@ -90,8 +102,9 @@ const App = () => (
                   }
                 />
                 <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
+                </Routes>
+              </Suspense>
+            </AppErrorBoundary>
             <MobileNav />
           </BrowserRouter>
         </TooltipProvider>
