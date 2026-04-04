@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { withTimeout } from '@/lib/async';
 import { buildMemorySearchResult, buildMilestoneSummary, buildMonthlyRecap } from '@/lib/relationship-ai';
 import {
   getNextStage,
@@ -71,11 +72,15 @@ export const useRelationshipSpaceData = () => {
     try {
       if (showLoader) setLoading(true);
 
-      const { data: relationshipRows, error: relationshipError } = await supabase
-        .from('relationships')
-        .select('*')
-        .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
-        .order('updated_at', { ascending: false });
+      const { data: relationshipRows, error: relationshipError } = await withTimeout(
+        supabase
+          .from('relationships')
+          .select('*')
+          .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
+          .order('updated_at', { ascending: false }),
+        10000,
+        'Loading relationships'
+      );
 
       if (relationshipError) {
         throw relationshipError;
@@ -89,10 +94,14 @@ export const useRelationshipSpaceData = () => {
 
       let partnerMap = new Map<string, UserRow>();
       if (partnerIds.length > 0) {
-        const { data: partnerRows, error: partnerError } = await supabase
-          .from('users')
-          .select('*')
-          .in('id', partnerIds);
+        const { data: partnerRows, error: partnerError } = await withTimeout(
+          supabase
+            .from('users')
+            .select('*')
+            .in('id', partnerIds),
+          8000,
+          'Loading relationship partners'
+        );
 
         if (partnerError) {
           throw partnerError;
@@ -132,28 +141,32 @@ export const useRelationshipSpaceData = () => {
         return;
       }
 
-      const [permissionResponse, memoryResponse, checkinResponse, summaryResponse] = await Promise.all([
-        supabase
-          .from('relationship_permissions')
-          .select('*')
-          .eq('relationship_id', nextPrimaryRelationship.id)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('memories')
-          .select('*')
-          .eq('relationship_id', nextPrimaryRelationship.id)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('weekly_checkins')
-          .select('*')
-          .eq('relationship_id', nextPrimaryRelationship.id)
-          .order('week_start', { ascending: false }),
-        supabase
-          .from('ai_summaries')
-          .select('*')
-          .eq('relationship_id', nextPrimaryRelationship.id)
-          .order('created_at', { ascending: false }),
-      ]);
+      const [permissionResponse, memoryResponse, checkinResponse, summaryResponse] = await withTimeout(
+        Promise.all([
+          supabase
+            .from('relationship_permissions')
+            .select('*')
+            .eq('relationship_id', nextPrimaryRelationship.id)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('memories')
+            .select('*')
+            .eq('relationship_id', nextPrimaryRelationship.id)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('weekly_checkins')
+            .select('*')
+            .eq('relationship_id', nextPrimaryRelationship.id)
+            .order('week_start', { ascending: false }),
+          supabase
+            .from('ai_summaries')
+            .select('*')
+            .eq('relationship_id', nextPrimaryRelationship.id)
+            .order('created_at', { ascending: false }),
+        ]),
+        10000,
+        'Loading relationship space'
+      );
 
       if (permissionResponse.error) throw permissionResponse.error;
       if (memoryResponse.error) throw memoryResponse.error;

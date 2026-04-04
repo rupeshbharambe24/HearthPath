@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Tables } from '@/integrations/supabase/types';
+import { withTimeout } from '@/lib/async';
 
 type ExploreProfile = Tables<'users'>;
 
@@ -19,23 +20,31 @@ export const useExploreData = () => {
   const [discoveryLocked, setDiscoveryLocked] = useState(false);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setLoading(false);
+      setProfiles([]);
+      return;
+    }
 
     const fetchProfiles = async () => {
       try {
         setLoading(true);
 
         const [{ data: relationshipRows, error: relationshipError }, { data: blockedRows, error: blockedError }] =
-          await Promise.all([
-            supabase
-              .from('relationships')
-              .select('id, user_a, user_b, lifecycle_state, current_stage')
-              .or(`user_a.eq.${user.id},user_b.eq.${user.id}`),
-            supabase
-              .from('blocked_users')
-              .select('blocker_id, blocked_id')
-              .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`),
-          ]);
+          await withTimeout(
+            Promise.all([
+              supabase
+                .from('relationships')
+                .select('id, user_a, user_b, lifecycle_state, current_stage')
+                .or(`user_a.eq.${user.id},user_b.eq.${user.id}`),
+              supabase
+                .from('blocked_users')
+                .select('blocker_id, blocked_id')
+                .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`),
+            ]),
+            10000,
+            'Loading discovery prerequisites'
+          );
 
         if (relationshipError) throw relationshipError;
         if (blockedError) throw blockedError;
@@ -78,7 +87,11 @@ export const useExploreData = () => {
           query = query.not('id', 'in', formatInList(excludedList));
         }
 
-        const { data: profilesData, error: profilesError } = await query;
+        const { data: profilesData, error: profilesError } = await withTimeout(
+          query,
+          10000,
+          'Loading discovery profiles'
+        );
 
         if (profilesError) throw profilesError;
 

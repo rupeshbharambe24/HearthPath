@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Tables } from '@/integrations/supabase/types';
+import { withTimeout } from '@/lib/async';
 
 type UserProfile = Tables<'users'>;
 
@@ -19,17 +20,26 @@ export const useUserData = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setLoading(false);
+      setProfile(null);
+      setRelationships([]);
+      return;
+    }
 
     const fetchUserData = async () => {
       try {
         setLoading(true);
 
-        const { data: profileData, error: profileError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', user.id)
-          .single();
+        const { data: profileData, error: profileError } = await withTimeout(
+          supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single(),
+          8000,
+          'Loading profile'
+        );
 
         if (profileError) {
           throw profileError;
@@ -37,11 +47,15 @@ export const useUserData = () => {
 
         setProfile(profileData);
 
-        const { data: relationshipRows, error: relationshipError } = await supabase
-          .from('relationships')
-          .select('*')
-          .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
-          .in('lifecycle_state', [...ACTIVE_RELATIONSHIP_STATES]);
+        const { data: relationshipRows, error: relationshipError } = await withTimeout(
+          supabase
+            .from('relationships')
+            .select('*')
+            .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
+            .in('lifecycle_state', [...ACTIVE_RELATIONSHIP_STATES]),
+          10000,
+          'Loading user relationships'
+        );
 
         if (relationshipError) {
           throw relationshipError;
@@ -57,10 +71,14 @@ export const useUserData = () => {
 
         let partnerMap = new Map<string, UserProfile>();
         if (partnerIds.length > 0) {
-          const { data: partnerRows, error: partnerError } = await supabase
-            .from('users')
-            .select('*')
-            .in('id', partnerIds);
+          const { data: partnerRows, error: partnerError } = await withTimeout(
+            supabase
+              .from('users')
+              .select('*')
+              .in('id', partnerIds),
+            8000,
+            'Loading relationship partner profiles'
+          );
 
           if (partnerError) {
             throw partnerError;

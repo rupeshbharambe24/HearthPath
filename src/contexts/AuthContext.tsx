@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { withTimeout } from '@/lib/async';
 
 interface AuthUser {
   id: string;
@@ -50,11 +51,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     while (retries > 0) {
       try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', authUser.id)
-          .maybeSingle();
+        const { data, error } = await withTimeout(
+          supabase
+            .from('users')
+            .select('*')
+            .eq('id', authUser.id)
+            .maybeSingle(),
+          8000,
+          'Loading user profile'
+        );
 
         if (error) throw error;
         profile = data;
@@ -90,7 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const {
       data: { user: authUser },
       error,
-    } = await supabase.auth.getUser();
+    } = await withTimeout(supabase.auth.getUser(), 10000, 'Refreshing authenticated user');
 
     if (error) {
       console.error('Error refreshing authenticated user:', error);
@@ -112,7 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const {
           data: { session },
           error,
-        } = await supabase.auth.getSession();
+        } = await withTimeout(supabase.auth.getSession(), 10000, 'Loading auth session');
 
         if (error) throw error;
         if (session?.user && mounted) {

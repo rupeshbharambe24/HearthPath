@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { withTimeout } from '@/lib/async';
 
 interface Message {
   id: string;
@@ -36,11 +37,15 @@ export const useMessages = () => {
     try {
       if (showLoader) setLoading(true);
 
-      const { data: messageRows, error: messageError } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order('created_at', { ascending: true });
+      const { data: messageRows, error: messageError } = await withTimeout(
+        supabase
+          .from('messages')
+          .select('*')
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+          .order('created_at', { ascending: true }),
+        10000,
+        'Loading messages'
+      );
 
       if (messageError) throw messageError;
 
@@ -57,10 +62,14 @@ export const useMessages = () => {
 
       let partnerMap = new Map<string, string>();
       if (partnerIds.length > 0) {
-        const { data: userRows, error: userError } = await supabase
-          .from('users')
-          .select('id, name')
-          .in('id', partnerIds);
+        const { data: userRows, error: userError } = await withTimeout(
+          supabase
+            .from('users')
+            .select('id, name')
+            .in('id', partnerIds),
+          8000,
+          'Loading chat partner names'
+        );
 
         if (userError) throw userError;
         partnerMap = new Map((userRows || []).map((partner) => [partner.id, partner.name]));

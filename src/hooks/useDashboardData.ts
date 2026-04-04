@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Tables } from '@/integrations/supabase/types';
+import { withTimeout } from '@/lib/async';
 
 interface DashboardStats {
   currentLevel: number;
@@ -54,20 +55,29 @@ export const useDashboardData = () => {
   useEffect(() => {
     if (user?.id) {
       fetchDashboardData();
+    } else {
+      setLoading(false);
     }
   }, [user?.id]);
 
   const fetchDashboardData = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
 
-      const { data: relationshipRows, error: relationshipError } = await supabase
-        .from('relationships')
-        .select('*')
-        .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
-        .in('lifecycle_state', [...ACTIVE_RELATIONSHIP_STATES]);
+      const { data: relationshipRows, error: relationshipError } = await withTimeout(
+        supabase
+          .from('relationships')
+          .select('*')
+          .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
+          .in('lifecycle_state', [...ACTIVE_RELATIONSHIP_STATES]),
+        10000,
+        'Loading dashboard relationships'
+      );
 
       if (relationshipError) {
         throw relationshipError;
@@ -83,10 +93,14 @@ export const useDashboardData = () => {
 
       let partnerMap = new Map<string, UserRow>();
       if (partnerIds.length > 0) {
-        const { data: partnerRows, error: partnerError } = await supabase
-          .from('users')
-          .select('id, name, college_name')
-          .in('id', partnerIds);
+        const { data: partnerRows, error: partnerError } = await withTimeout(
+          supabase
+            .from('users')
+            .select('id, name, college_name')
+            .in('id', partnerIds),
+          8000,
+          'Loading dashboard partner names'
+        );
 
         if (partnerError) {
           throw partnerError;
@@ -95,22 +109,30 @@ export const useDashboardData = () => {
         partnerMap = new Map((partnerRows || []).map((partner) => [partner.id, partner]));
       }
 
-      const { count: memoriesCount, error: memoriesError } = await supabase
-        .from('memories')
-        .select('*', { count: 'exact', head: true })
-        .eq('created_by', user.id);
+      const { count: memoriesCount, error: memoriesError } = await withTimeout(
+        supabase
+          .from('memories')
+          .select('*', { count: 'exact', head: true })
+          .eq('created_by', user.id),
+        8000,
+        'Loading dashboard memories'
+      );
 
       if (memoriesError) {
         throw memoriesError;
       }
 
-      const { data: lastMessage, error: messageError } = await supabase
-        .from('messages')
-        .select('created_at')
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const { data: lastMessage, error: messageError } = await withTimeout(
+        supabase
+          .from('messages')
+          .select('created_at')
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        8000,
+        'Loading dashboard activity'
+      );
 
       if (messageError) {
         throw messageError;
