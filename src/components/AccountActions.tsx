@@ -1,14 +1,20 @@
-
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Lock, LogOut, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { Lock, Trash2, LogOut } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
 const AccountActions: React.FC = () => {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -17,8 +23,9 @@ const AccountActions: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
-  
-  const { logout } = useAuth();
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const { logout, deleteAccount, user } = useAuth();
   const navigate = useNavigate();
 
   const handlePasswordChange = async () => {
@@ -26,7 +33,7 @@ const AccountActions: React.FC = () => {
       toast.error('Passwords do not match');
       return;
     }
-    
+
     if (newPassword.length < 6) {
       toast.error('Password must be at least 6 characters long');
       return;
@@ -34,12 +41,12 @@ const AccountActions: React.FC = () => {
 
     try {
       const { error } = await supabase.auth.updateUser({
-        password: newPassword
+        password: newPassword,
       });
 
       if (error) throw error;
 
-      toast.success('Password changed successfully!');
+      toast.success('Password changed successfully');
       setShowPasswordDialog(false);
       setCurrentPassword('');
       setNewPassword('');
@@ -57,19 +64,20 @@ const AccountActions: React.FC = () => {
     }
 
     try {
-      // For now, just sign out the user
-      // Note: Full account deletion would require admin privileges or server-side function
-      toast.success('Account deletion requested. Please contact support for complete removal.');
-      logout();
+      setIsDeleting(true);
+      await deleteAccount(deleteConfirmation);
+      setShowDeleteDialog(false);
+      setDeleteConfirmation('');
       navigate('/');
-    } catch (error: any) {
-      console.error('Error with account deletion:', error);
-      toast.error('Failed to process account deletion');
+    } catch (error) {
+      console.error('Error deleting account:', error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   const handleLogout = () => {
-    logout();
+    void logout();
     navigate('/');
   };
 
@@ -81,7 +89,7 @@ const AccountActions: React.FC = () => {
           onClick={() => setShowPasswordDialog(true)}
           className="flex items-center justify-center space-x-2"
         >
-          <Lock className="w-4 h-4" />
+          <Lock className="h-4 w-4" />
           <span>Change Password</span>
         </Button>
 
@@ -90,7 +98,7 @@ const AccountActions: React.FC = () => {
           onClick={handleLogout}
           className="flex items-center justify-center space-x-2"
         >
-          <LogOut className="w-4 h-4" />
+          <LogOut className="h-4 w-4" />
           <span>Sign Out</span>
         </Button>
 
@@ -99,12 +107,11 @@ const AccountActions: React.FC = () => {
           onClick={() => setShowDeleteDialog(true)}
           className="flex items-center justify-center space-x-2"
         >
-          <Trash2 className="w-4 h-4" />
+          <Trash2 className="h-4 w-4" />
           <span>Delete Account</span>
         </Button>
       </div>
 
-      {/* Change Password Dialog */}
       <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
         <DialogContent>
           <DialogHeader>
@@ -120,7 +127,7 @@ const AccountActions: React.FC = () => {
                 id="current"
                 type="password"
                 value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
+                onChange={(event) => setCurrentPassword(event.target.value)}
               />
             </div>
             <div>
@@ -129,7 +136,7 @@ const AccountActions: React.FC = () => {
                 id="new"
                 type="password"
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                onChange={(event) => setNewPassword(event.target.value)}
               />
             </div>
             <div>
@@ -138,7 +145,7 @@ const AccountActions: React.FC = () => {
                 id="confirm"
                 type="password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(event) => setConfirmPassword(event.target.value)}
               />
             </div>
           </div>
@@ -146,46 +153,42 @@ const AccountActions: React.FC = () => {
             <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handlePasswordChange}>
-              Change Password
-            </Button>
+            <Button onClick={handlePasswordChange}>Change Password</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Account Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Account</DialogTitle>
             <DialogDescription>
-              This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
+              This action cannot be undone. Your HeartPath account, verification state, profile, photos, messages,
+              memories, reports, and relationship history will be permanently removed.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
               <p className="text-sm text-red-800 dark:text-red-200">
-                ⚠️ Warning: This will delete all your matches, messages, photos, and profile data permanently.
+                Warning: This permanently removes your HeartPath account for {user?.email || 'this user'} and cannot be undone.
               </p>
             </div>
             <div>
-              <Label htmlFor="deleteConfirm">
-                Type "delete" to confirm account deletion
-              </Label>
+              <Label htmlFor="deleteConfirm">Type "delete" to confirm account deletion</Label>
               <Input
                 id="deleteConfirm"
                 value={deleteConfirmation}
-                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                onChange={(event) => setDeleteConfirmation(event.target.value)}
                 placeholder="Type 'delete' here"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteAccount}>
-              Delete Account
+            <Button variant="destructive" onClick={handleDeleteAccount} disabled={isDeleting}>
+              {isDeleting ? 'Deleting account...' : 'Delete Account'}
             </Button>
           </DialogFooter>
         </DialogContent>

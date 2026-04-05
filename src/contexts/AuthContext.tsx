@@ -54,6 +54,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (data: SignupData) => Promise<SignupResult>;
   logout: () => Promise<void>;
+  deleteAccount: (confirmation: string) => Promise<void>;
   refreshUser: () => Promise<void>;
   resendVerificationEmail: (email: string) => Promise<void>;
 }
@@ -332,6 +333,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const deleteAccount = async (confirmation: string) => {
+    try {
+      setIsLoading(true);
+
+      const { data, error } = await supabase.functions.invoke('delete-account', {
+        body: {
+          confirmation,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Account deletion failed.');
+      }
+
+      await supabase.auth.signOut().catch(() => undefined);
+      setUser(null);
+
+      toast({
+        title: 'Account deleted',
+        description: 'Your HeartPath account and related data have been permanently removed.',
+      });
+    } catch (error: any) {
+      console.error('Delete account error:', error);
+      toast({
+        title: 'Account deletion failed',
+        description:
+          error.message ||
+          'Unable to delete this account right now. If the delete-account function is not deployed yet, deploy it in Supabase first.',
+        variant: 'destructive',
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -341,6 +382,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         signup,
         logout,
+        deleteAccount,
         refreshUser,
         resendVerificationEmail,
       }}

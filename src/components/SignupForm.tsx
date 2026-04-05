@@ -65,12 +65,12 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, onSwitchToLogin }) =>
             Join HeartPath
           </CardTitle>
           <CardDescription>
-            Use your approved college email to begin verified access
+            Use an approved email domain to begin verified access
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="mb-4 rounded-xl border border-romantic-pink/30 bg-romantic-light-pink/60 p-3 text-sm text-gray-700 dark:border-romantic-red/20 dark:bg-romantic-red/10 dark:text-gray-200">
-            HeartPath is currently limited to approved college email domains. You will verify your email before the app unlocks.
+            HeartPath is built for verified student access. During testing, approved public email domains may also be enabled before the app fully locks to college verification.
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -86,11 +86,11 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, onSwitchToLogin }) =>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">College Email</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="you@college.edu"
+                placeholder="you@college.edu or you@gmail.com"
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
                 required
