@@ -4,6 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { withTimeout } from '@/lib/async';
 import { buildMemorySearchResult, buildMilestoneSummary, buildMonthlyRecap } from '@/lib/relationship-ai';
 import {
+  canGrantPermissionAtStage,
+  getCooldownLabel,
   getNextStage,
   hasLivePermission,
   HEARTPATH_PERMISSION_CATALOG,
@@ -20,6 +22,7 @@ type PermissionRow = Tables<'relationship_permissions'>;
 type MemoryRow = Tables<'memories'>;
 type CheckinRow = Tables<'weekly_checkins'>;
 type SummaryRow = Tables<'ai_summaries'>;
+type RelationshipEventRow = Tables<'relationship_events'>;
 
 export interface RelationshipWithPartner extends RelationshipRow {
   partner: UserRow | null;
@@ -53,7 +56,27 @@ export const useRelationshipSpaceData = () => {
   const [memories, setMemories] = useState<MemoryRow[]>([]);
   const [checkins, setCheckins] = useState<CheckinRow[]>([]);
   const [aiSummaries, setAiSummaries] = useState<SummaryRow[]>([]);
+  const [events, setEvents] = useState<RelationshipEventRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const createRelationshipEvent = async (
+    relationshipId: string,
+    eventType: RelationshipEventRow['event_type'],
+    metadata: Record<string, unknown> = {}
+  ) => {
+    if (!user?.id) return;
+
+    const { error } = await supabase.from('relationship_events').insert({
+      relationship_id: relationshipId,
+      actor_user_id: user.id,
+      event_type: eventType,
+      metadata,
+    });
+
+    if (error) {
+      console.error('Error writing relationship event:', error);
+    }
+  };
 
   const fetchData = async (showLoader = true) => {
     if (!user?.id) {
@@ -65,6 +88,7 @@ export const useRelationshipSpaceData = () => {
       setMemories([]);
       setCheckins([]);
       setAiSummaries([]);
+      setEvents([]);
       setLoading(false);
       return;
     }
@@ -138,10 +162,11 @@ export const useRelationshipSpaceData = () => {
         setMemories([]);
         setCheckins([]);
         setAiSummaries([]);
+        setEvents([]);
         return;
       }
 
-      const [permissionResponse, memoryResponse, checkinResponse, summaryResponse] = await withTimeout(
+      const [permissionResponse, memoryResponse, checkinResponse, summaryResponse, eventResponse] = await withTimeout(
         Promise.all([
           supabase
             .from('relationship_permissions')
@@ -163,6 +188,11 @@ export const useRelationshipSpaceData = () => {
             .select('*')
             .eq('relationship_id', nextPrimaryRelationship.id)
             .order('created_at', { ascending: false }),
+          supabase
+            .from('relationship_events')
+            .select('*')
+            .eq('relationship_id', nextPrimaryRelationship.id)
+            .order('created_at', { ascending: false }),
         ]),
         10000,
         'Loading relationship space'
@@ -172,11 +202,13 @@ export const useRelationshipSpaceData = () => {
       if (memoryResponse.error) throw memoryResponse.error;
       if (checkinResponse.error) throw checkinResponse.error;
       if (summaryResponse.error) throw summaryResponse.error;
+      if (eventResponse.error) throw eventResponse.error;
 
       setPermissions(permissionResponse.data || []);
       setMemories(memoryResponse.data || []);
       setCheckins(checkinResponse.data || []);
       setAiSummaries(summaryResponse.data || []);
+      setEvents(eventResponse.data || []);
     } catch (error) {
       console.error('Error fetching HeartPath relationship space:', error);
     } finally {
@@ -227,6 +259,7 @@ export const useRelationshipSpaceData = () => {
   const sharedAiEnabled =
     hasLivePermission(myPermissions, 'ai_shared_recap_access') &&
     hasLivePermission(partnerPermissions, 'ai_shared_recap_access');
+  const stageRequestCooldownLabel = getCooldownLabel(primaryRelationship?.stage_request_cooldown_until);
 
   const acceptRequest = async (relationshipId: string) => {
     try {
@@ -244,6 +277,10 @@ export const useRelationshipSpaceData = () => {
         .eq('id', relationshipId);
 
       if (error) throw error;
+      await createRelationshipEvent(relationshipId, 'request_accepted', {
+        lifecycle_state: 'active',
+        accepted_stage: 1,
+      });
       await fetchData();
       return { success: true as const };
     } catch (error) {
@@ -267,6 +304,9 @@ export const useRelationshipSpaceData = () => {
         .eq('id', relationshipId);
 
       if (error) throw error;
+      await createRelationshipEvent(relationshipId, 'request_declined', {
+        archived_at: new Date().toISOString(),
+      });
       await fetchData();
       return { success: true as const };
     } catch (error) {
@@ -295,6 +335,9 @@ export const useRelationshipSpaceData = () => {
         .eq('id', primaryRelationship.id);
 
       if (error) throw error;
+      await createRelationshipEvent(primaryRelationship.id, 'heart_sent', {
+        trust_score: Math.min((primaryRelationship.trust_score || 0) + 2, 100),
+      });
       await fetchData();
       return { success: true as const };
     } catch (error) {
@@ -340,6 +383,10 @@ export const useRelationshipSpaceData = () => {
         .eq('id', primaryRelationship.id);
 
       if (error) throw error;
+      await createRelationshipEvent(primaryRelationship.id, 'stage_requested', {
+        from_stage: currentStage,
+        requested_stage: nextStage,
+      });
       await fetchData();
       return { success: true as const, nextStage };
     } catch (error) {
@@ -377,19 +424,28 @@ export const useRelationshipSpaceData = () => {
           .eq('id', primaryRelationship.id);
 
         if (error) throw error;
+        await createRelationshipEvent(primaryRelationship.id, 'stage_accepted', {
+          previous_stage: currentStage,
+          accepted_stage: acceptedStage,
+        });
       } else {
+        const cooldownUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
         const { error } = await supabase
           .from('relationships')
           .update({
             requested_stage: null,
             stage_request_status: decision === 'decline' ? 'declined' : 'deferred',
             stage_request_from_user_id: null,
-            stage_request_cooldown_until: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+            stage_request_cooldown_until: cooldownUntil,
             updated_at: new Date().toISOString(),
           })
           .eq('id', primaryRelationship.id);
 
         if (error) throw error;
+        await createRelationshipEvent(primaryRelationship.id, decision === 'decline' ? 'stage_declined' : 'stage_deferred', {
+          current_stage: currentStage,
+          cooldown_until: cooldownUntil,
+        });
       }
 
       await fetchData();
@@ -403,6 +459,10 @@ export const useRelationshipSpaceData = () => {
   const setPermissionState = async (permission: HeartPathPermissionName, enabled: boolean) => {
     if (!user?.id || !primaryRelationship || !partner?.id) {
       return { success: false as const, error: 'No relationship available to update permissions.' };
+    }
+
+    if (enabled && !canGrantPermissionAtStage(permission, currentStage)) {
+      return { success: false as const, error: 'This permission unlocks at a later HeartPath stage.' };
     }
 
     try {
@@ -436,6 +496,10 @@ export const useRelationshipSpaceData = () => {
       }
 
       await fetchData();
+      await createRelationshipEvent(primaryRelationship.id, enabled ? 'permission_granted' : 'permission_revoked', {
+        permission,
+        granted_to: partner.id,
+      });
       return { success: true as const };
     } catch (error) {
       console.error('Error updating permission:', error);
@@ -468,6 +532,10 @@ export const useRelationshipSpaceData = () => {
       );
 
       if (error) throw error;
+      await createRelationshipEvent(primaryRelationship.id, 'checkin_saved', {
+        visibility: input.visibility,
+        relationship_rating: input.relationship_rating,
+      });
       await fetchData();
       return { success: true as const };
     } catch (error) {
@@ -506,6 +574,10 @@ export const useRelationshipSpaceData = () => {
       });
 
       if (error) throw error;
+      await createRelationshipEvent(primaryRelationship.id, 'memory_saved', {
+        entry_type: input.entry_type,
+        visibility: input.visibility,
+      });
       await fetchData();
       return { success: true as const };
     } catch (error) {
@@ -605,6 +677,9 @@ export const useRelationshipSpaceData = () => {
         .eq('id', primaryRelationship.id);
 
       if (error) throw error;
+      await createRelationshipEvent(primaryRelationship.id, paused ? 'paused' : 'resumed', {
+        lifecycle_state: paused ? 'paused' : fallbackState,
+      });
       await fetchData();
       return { success: true as const };
     } catch (error) {
@@ -669,6 +744,10 @@ export const useRelationshipSpaceData = () => {
           .in('permission', SHARED_PERMISSION_NAMES);
       }
 
+      await createRelationshipEvent(primaryRelationship.id, 'archived', {
+        lifecycle_state: 'cooldown',
+        cooldown_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      });
       await fetchData();
       return { success: true as const };
     } catch (error) {
@@ -688,12 +767,14 @@ export const useRelationshipSpaceData = () => {
     memories,
     checkins,
     aiSummaries,
+    events,
     currentStage,
     nextStage,
     requestIsOpen,
     isExclusive,
     isPaused,
     discoveryLocked,
+    stageRequestCooldownLabel,
     activeRelationshipCount: relationships.filter((relationship) =>
       ACTIVE_STATES.includes((relationship.lifecycle_state || 'pending') as (typeof ACTIVE_STATES)[number])
     ).length,

@@ -18,6 +18,33 @@ export const HEARTPATH_PERMISSION_CATALOG = [
   { key: 'ai_shared_recap_access', label: 'AI shared recap access', description: 'Allow assistive AI to create shared recaps from your relationship moments.' },
 ] as const;
 
+export const HEARTPATH_STAGE_RITUALS = {
+  1: {
+    title: 'Start slow',
+    prompt: 'Share small, honest details and see whether the interaction feels safe and respectful.',
+  },
+  2: {
+    title: 'Build familiarity',
+    prompt: 'Notice consistency. Are both of you showing up without pressure or performance?',
+  },
+  3: {
+    title: 'Strengthen friendship',
+    prompt: 'Talk about values, routines, and what trust means before opening more access.',
+  },
+  4: {
+    title: 'Deepen carefully',
+    prompt: 'Use this stage to clarify boundaries, comfort, and emotional pace before romantic escalation.',
+  },
+  5: {
+    title: 'Name the emotional shift',
+    prompt: 'Move here only if both of you want intentional romantic closeness and clearer commitment.',
+  },
+  6: {
+    title: 'Protect exclusivity',
+    prompt: 'Exclusive mode should feel chosen, mutual, and stable enough to lock discovery outside the relationship.',
+  },
+} as const;
+
 export type HeartPathStage = typeof HEARTPATH_STAGES[number]['stage'];
 export type HeartPathPermissionName = typeof HEARTPATH_PERMISSION_CATALOG[number]['key'];
 export type HeartPathLifecycleState =
@@ -33,12 +60,26 @@ export const SHARED_PERMISSION_NAMES: HeartPathPermissionName[] = [
   'ai_shared_recap_access',
 ];
 
+export const PERMISSION_STAGE_REQUIREMENTS: Record<HeartPathPermissionName, HeartPathStage> = {
+  full_face_photo: 5,
+  private_photo_gallery: 4,
+  voice_notes: 3,
+  deeper_profile_details: 3,
+  shared_memory_vault: 4,
+  ai_shared_recap_access: 5,
+};
+
 export function getStageName(stage?: number | null) {
   return HEARTPATH_STAGES.find((item) => item.stage === stage)?.name ?? HEARTPATH_STAGES[0].name;
 }
 
 export function getStageDescription(stage?: number | null) {
   return HEARTPATH_STAGES.find((item) => item.stage === stage)?.description ?? HEARTPATH_STAGES[0].description;
+}
+
+export function getStageRitual(stage?: number | null) {
+  const normalizedStage = normalizeStage(stage);
+  return HEARTPATH_STAGE_RITUALS[normalizedStage as keyof typeof HEARTPATH_STAGE_RITUALS];
 }
 
 export function normalizeStage(stage?: number | null) {
@@ -54,6 +95,22 @@ export function isOpenStageRequest(requestedStage?: number | null, status?: stri
 export function getNextStage(stage?: number | null) {
   const currentStage = normalizeStage(stage);
   return currentStage >= 6 ? null : currentStage + 1;
+}
+
+export function getRequiredStageForPermission(permissionName: HeartPathPermissionName) {
+  return PERMISSION_STAGE_REQUIREMENTS[permissionName];
+}
+
+export function canGrantPermissionAtStage(permissionName: HeartPathPermissionName, stage?: number | null) {
+  return normalizeStage(stage) >= getRequiredStageForPermission(permissionName);
+}
+
+export function getStageUnlocks(stage?: number | null) {
+  const normalizedStage = normalizeStage(stage);
+
+  return HEARTPATH_PERMISSION_CATALOG.filter(
+    (permission) => getRequiredStageForPermission(permission.key) <= normalizedStage
+  );
 }
 
 export function normalizePhotoLevels(photoLevels?: Json | null) {
