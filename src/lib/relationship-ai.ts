@@ -91,3 +91,34 @@ export function buildMemorySearchResult(query: string, memories: RelationshipSum
 
   return { title, summary };
 }
+
+export function buildResurfacedMoments(input: RelationshipSummaryInput) {
+  const resurfaced = input.memories
+    .filter((memory) => memory.memo_text)
+    .filter((memory) => ['milestone', 'gratitude', 'date', 'promise', 'repair'].includes(memory.entry_type || ''))
+    .slice(0, 3)
+    .map((memory) => ({
+      title: memory.entry_type ? memory.entry_type.replaceAll('_', ' ') : 'memory',
+      body: memory.memo_text || '',
+      mood: memory.mood || null,
+      createdAt: memory.created_at || null,
+    }));
+
+  return resurfaced;
+}
+
+export function buildRelationshipPulse(input: RelationshipSummaryInput) {
+  const rating = average(input.checkins.map((checkin) => checkin.relationship_rating));
+  const gratitudeCount = input.checkins.filter((checkin) => !!checkin.gratitude_note).length;
+  const hardMomentCount = input.memories.filter((memory) => memory.entry_type === 'hard_moment').length;
+  const repairCount = input.memories.filter((memory) => memory.entry_type === 'repair').length;
+
+  return [
+    rating ? `Average check-in rating: ${rating}/5.` : 'No weekly check-ins recorded yet.',
+    gratitudeCount ? `${gratitudeCount} gratitude notes have been recorded.` : 'No gratitude notes recorded yet.',
+    hardMomentCount
+      ? `${hardMomentCount} hard moments were acknowledged${repairCount ? ` and ${repairCount} repair entries followed.` : '.'}`
+      : 'No hard-moment entries have been recorded.',
+    'AI note: this pulse is a summary of saved relationship records, not advice.',
+  ];
+}
