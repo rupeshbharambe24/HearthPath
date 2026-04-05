@@ -29,6 +29,7 @@ import { getAllowedOnboardingSteps, getNextOnboardingStep } from '@/lib/onboardi
 import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
 
 type UserRow = Tables<'users'>;
+type VerificationRow = Tables<'user_verifications'>;
 
 const hobbyOptions = [
   'Reading',
@@ -101,6 +102,11 @@ const Onboarding = () => {
   const [customDealBreaker, setCustomDealBreaker] = useState('');
   const [customValue, setCustomValue] = useState('');
   const [customLifestyle, setCustomLifestyle] = useState('');
+  const [studentVerification, setStudentVerification] = useState<VerificationRow | null>(null);
+  const [studentIdCollegeName, setStudentIdCollegeName] = useState('');
+  const [studentIdNotes, setStudentIdNotes] = useState('');
+  const [studentIdFile, setStudentIdFile] = useState<File | null>(null);
+  const [studentIdUploadStatus, setStudentIdUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const { user, refreshUser, resendVerificationEmail, logout } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -138,16 +144,39 @@ const Onboarding = () => {
     try {
       setIsLoadingProfile(true);
 
-      const [{ data: profileRow, error: profileError }, { data: domainRows, error: domainError }] = await Promise.all([
+      const [{ data: profileRow, error: profileError }, { data: domainRows, error: domainError }, { data: verificationRow, error: verificationError }] = await Promise.all([
         supabase.rpc('sync_user_access_state'),
         supabase.rpc('check_college_email_domain', { email: user.email }),
+        supabase
+          .from('user_verifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('verification_type', 'student_verified')
+          .maybeSingle(),
       ]);
 
       if (profileError) throw profileError;
       if (domainError) throw domainError;
+      if (verificationError) throw verificationError;
 
       setProfile(profileRow);
       setDomainCollegeName(domainRows?.[0]?.college_name ?? null);
+      setStudentVerification(verificationRow);
+
+      const verificationMetadata =
+        verificationRow?.metadata && typeof verificationRow.metadata === 'object' && !Array.isArray(verificationRow.metadata)
+          ? (verificationRow.metadata as Record<string, unknown>)
+          : null;
+      setStudentIdCollegeName(
+        (typeof verificationMetadata?.submitted_college_name === 'string' ? verificationMetadata.submitted_college_name : '') ||
+          profileRow?.college_name ||
+          domainRows?.[0]?.college_name ||
+          ''
+      );
+      setStudentIdNotes(typeof verificationMetadata?.notes === 'string' ? verificationMetadata.notes : '');
+      setStudentIdFile(null);
+      setStudentIdUploadStatus('idle');
+
       setFormData({
         name: profileRow?.name || '',
         college_name: profileRow?.college_name || domainRows?.[0]?.college_name || '',
@@ -216,6 +245,35 @@ const Onboarding = () => {
     reader.readAsDataURL(file);
   };
 
+  const handleStudentIdSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    const maxSize = 8 * 1024 * 1024;
+
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: 'Unsupported file type',
+        description: 'Upload a JPG, PNG, or PDF version of your college ID card.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (file.size > maxSize) {
+      toast({
+        title: 'File too large',
+        description: 'Keep the file under 8MB.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setStudentIdFile(file);
+    setStudentIdUploadStatus('idle');
+  };
+
   const uploadPhoto = async (file: File) => {
     if (!user?.id) {
       throw new Error('You must be signed in to upload a photo.');
@@ -234,6 +292,76 @@ const Onboarding = () => {
     const { data } = supabase.storage.from('profile-photos').getPublicUrl(fileName);
     setUploadStatus('success');
     return data.publicUrl;
+  };
+
+  const submitStudentIdVerification = async () => {
+    if (!user?.id) {
+      throw new Error('You must be signed in to submit verification.');
+    }
+
+    if (!studentIdCollegeName.trim()) {
+      throw new Error('Enter the college name shown on your ID card.');
+    }
+
+    if (!studentIdFile) {
+      throw new Error('Upload your college ID card before submitting.');
+    }
+
+    setStudentIdUploadStatus('uploading');
+    const extension = studentIdFile.name.split('.').pop() || 'jpg';
+    const fileName = `${user.id}/student-id.${extension}`;
+
+    const previousMetadata =
+      studentVerification?.metadata && typeof studentVerification.metadata === 'object' && !Array.isArray(studentVerification.metadata)
+        ? (studentVerification.metadata as Record<string, unknown>)
+        : null;
+    const previousPath = typeof previousMetadata?.document_path === 'string' ? previousMetadata.document_path : null;
+
+    if (previousPath) {
+      await supabase.storage.from('verification-documents').remove([previousPath]);
+    }
+
+    const { error: uploadError } = await supabase
+      .storage
+      .from('verification-documents')
+      .upload(fileName, studentIdFile, { upsert: true });
+
+    if (uploadError) {
+      setStudentIdUploadStatus('error');
+      throw uploadError;
+    }
+
+    const { error: verificationError } = await supabase
+      .from('user_verifications')
+      .upsert(
+        {
+          user_id: user.id,
+          verification_type: 'student_verified',
+          status: 'pending',
+          verified_at: null,
+          metadata: {
+            source: 'id_card',
+            document_path: fileName,
+            file_name: studentIdFile.name,
+            submitted_college_name: studentIdCollegeName.trim(),
+            notes: studentIdNotes.trim() || null,
+            submitted_at: new Date().toISOString(),
+          },
+        },
+        { onConflict: 'user_id,verification_type' }
+      );
+
+    if (verificationError) {
+      setStudentIdUploadStatus('error');
+      throw verificationError;
+    }
+
+    setStudentIdUploadStatus('success');
+    await loadProfile();
+    toast({
+      title: 'College ID submitted',
+      description: 'Your document has been submitted for student verification review.',
+    });
   };
 
   const saveStep = async (step: OnboardingStep) => {
@@ -408,6 +536,12 @@ const Onboarding = () => {
 
   const renderVerifyStep = () => {
     const isBlocked = accessState === 'blocked';
+    const studentVerificationSource =
+      studentVerification?.metadata && typeof studentVerification.metadata === 'object' && !Array.isArray(studentVerification.metadata)
+        ? (studentVerification.metadata as Record<string, unknown>).source
+        : null;
+    const usesIdReview = studentVerificationSource === 'id_card';
+    const studentVerificationStatus = studentVerification?.status || null;
 
     return (
       <div className="space-y-6">
@@ -415,7 +549,7 @@ const Onboarding = () => {
           profileCompleteness={profileCompleteness}
           verificationBadges={verificationBadges}
           title="Verified student access"
-          description="HeartPath unlocks only after your approved college email has been confirmed."
+          description="HeartPath unlocks after your email is confirmed and your student status is verified through an approved domain or college ID review."
         />
 
         <Card className="border-romantic-pink/30 dark:bg-romantic-dark-card">
@@ -440,9 +574,29 @@ const Onboarding = () => {
               </div>
             ) : null}
 
-            {isBlocked ? (
+            {verificationBadges.email_verified && !verificationBadges.student_verified ? (
+              <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
+                {domainCollegeName
+                  ? 'Your email domain is approved, but your student verification has not fully synced yet. Retry verification below.'
+                  : 'No approved college domain was detected for this email. You can submit your college ID card for manual student verification.'}
+              </div>
+            ) : null}
+
+            {studentVerificationStatus === 'pending' ? (
+              <div className="rounded-2xl border border-blue-300 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-200">
+                Your college ID submission is pending review. You will unlock the next step as soon as it is approved.
+              </div>
+            ) : null}
+
+            {studentVerificationStatus === 'reviewing' ? (
+              <div className="rounded-2xl border border-blue-300 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-200">
+                Your college ID is currently being reviewed by HeartPath.
+              </div>
+            ) : null}
+
+            {studentVerificationStatus === 'rejected' ? (
               <div className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-700 dark:bg-red-950/30 dark:text-red-200">
-                This email domain is not currently approved for HeartPath. Use an approved college email to continue.
+                Your last college ID submission was not approved. You can submit a clearer or current document below.
               </div>
             ) : null}
 
@@ -467,6 +621,97 @@ const Onboarding = () => {
             </div>
           </CardContent>
         </Card>
+
+        {verificationBadges.email_verified && !verificationBadges.student_verified ? (
+          <Card className="border-romantic-pink/30 dark:bg-romantic-dark-card">
+            <CardHeader>
+              <CardTitle className="text-lg">College ID verification</CardTitle>
+              <CardDescription>
+                If your college does not issue domain-based email, submit your student ID card for HeartPath review.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="student_id_college_name">College Name On ID *</Label>
+                  <Input
+                    id="student_id_college_name"
+                    value={studentIdCollegeName}
+                    onChange={(event) => setStudentIdCollegeName(event.target.value)}
+                    placeholder="Enter the college name printed on your ID"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="student_id_file">College ID Upload *</Label>
+                  <Input
+                    id="student_id_file"
+                    type="file"
+                    accept="image/jpeg,image/png,image/jpg,application/pdf"
+                    onChange={handleStudentIdSelect}
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Accepted formats: JPG, PNG, PDF. Max 8MB.</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="student_id_notes">Notes for verification</Label>
+                <Textarea
+                  id="student_id_notes"
+                  value={studentIdNotes}
+                  onChange={(event) => setStudentIdNotes(event.target.value)}
+                  placeholder="Optional note if your ID has an unusual format, abbreviated college name, or renewal issue."
+                  className="min-h-[96px]"
+                />
+              </div>
+
+              <div className="rounded-2xl border border-romantic-pink/20 bg-romantic-light-pink/40 p-4 text-sm text-gray-700 dark:border-romantic-red/10 dark:bg-romantic-red/10 dark:text-gray-300">
+                <p className="font-medium text-gray-900 dark:text-white">Privacy note</p>
+                <p className="mt-1">
+                  Your ID card is used only for student verification review. It is not shown to other users and should be removed once verification is complete.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="button" className="romantic-btn" onClick={() => void submitStudentIdVerification()} disabled={!studentIdFile || isSubmitting}>
+                  Submit college ID
+                </Button>
+                {studentIdFile ? (
+                  <span className="text-sm text-gray-500 dark:text-gray-400">{studentIdFile.name}</span>
+                ) : null}
+              </div>
+
+              {usesIdReview ? (
+                <div className="rounded-2xl border p-4 text-sm text-gray-600 dark:text-gray-300">
+                  <p className="font-medium text-gray-900 dark:text-white">Current ID review status</p>
+                  <p className="mt-1">
+                    {studentVerificationStatus === 'verified'
+                      ? 'Approved'
+                      : studentVerificationStatus === 'rejected'
+                        ? 'Rejected'
+                        : studentVerificationStatus === 'reviewing'
+                          ? 'Reviewing'
+                          : 'Pending review'}
+                  </p>
+                </div>
+              ) : null}
+
+              {studentIdUploadStatus !== 'idle' ? (
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  {studentIdUploadStatus === 'uploading' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {studentIdUploadStatus === 'success' ? <CheckCircle className="h-4 w-4 text-green-500" /> : null}
+                  {studentIdUploadStatus === 'error' ? <AlertCircle className="h-4 w-4 text-red-500" /> : null}
+                  <span>
+                    {studentIdUploadStatus === 'uploading'
+                      ? 'Uploading your college ID...'
+                      : studentIdUploadStatus === 'success'
+                        ? 'College ID submitted successfully.'
+                        : 'College ID upload failed.'}
+                  </span>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     );
   };
