@@ -23,6 +23,7 @@ type MemoryRow = Tables<'memories'>;
 type CheckinRow = Tables<'weekly_checkins'>;
 type SummaryRow = Tables<'ai_summaries'>;
 type RelationshipEventRow = Tables<'relationship_events'>;
+type ReportRow = Tables<'reports'>;
 
 export interface RelationshipWithPartner extends RelationshipRow {
   partner: UserRow | null;
@@ -57,6 +58,7 @@ export const useRelationshipSpaceData = () => {
   const [checkins, setCheckins] = useState<CheckinRow[]>([]);
   const [aiSummaries, setAiSummaries] = useState<SummaryRow[]>([]);
   const [events, setEvents] = useState<RelationshipEventRow[]>([]);
+  const [reports, setReports] = useState<ReportRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const createRelationshipEvent = async (
@@ -89,6 +91,7 @@ export const useRelationshipSpaceData = () => {
       setCheckins([]);
       setAiSummaries([]);
       setEvents([]);
+      setReports([]);
       setLoading(false);
       return;
     }
@@ -163,10 +166,11 @@ export const useRelationshipSpaceData = () => {
         setCheckins([]);
         setAiSummaries([]);
         setEvents([]);
+        setReports([]);
         return;
       }
 
-      const [permissionResponse, memoryResponse, checkinResponse, summaryResponse, eventResponse] = await withTimeout(
+      const [permissionResponse, memoryResponse, checkinResponse, summaryResponse, eventResponse, reportResponse] = await withTimeout(
         Promise.all([
           supabase
             .from('relationship_permissions')
@@ -193,6 +197,11 @@ export const useRelationshipSpaceData = () => {
             .select('*')
             .eq('relationship_id', nextPrimaryRelationship.id)
             .order('created_at', { ascending: false }),
+          supabase
+            .from('reports')
+            .select('*')
+            .eq('relationship_id', nextPrimaryRelationship.id)
+            .order('created_at', { ascending: false }),
         ]),
         10000,
         'Loading relationship space'
@@ -203,12 +212,14 @@ export const useRelationshipSpaceData = () => {
       if (checkinResponse.error) throw checkinResponse.error;
       if (summaryResponse.error) throw summaryResponse.error;
       if (eventResponse.error) throw eventResponse.error;
+      if (reportResponse.error) throw reportResponse.error;
 
       setPermissions(permissionResponse.data || []);
       setMemories(memoryResponse.data || []);
       setCheckins(checkinResponse.data || []);
       setAiSummaries(summaryResponse.data || []);
       setEvents(eventResponse.data || []);
+      setReports(reportResponse.data || []);
     } catch (error) {
       console.error('Error fetching HeartPath relationship space:', error);
     } finally {
@@ -231,6 +242,7 @@ export const useRelationshipSpaceData = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'weekly_checkins' }, () => void fetchData(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_summaries' }, () => void fetchData(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'memories' }, () => void fetchData(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, () => void fetchData(false))
       .subscribe();
 
     return () => {
@@ -540,7 +552,7 @@ export const useRelationshipSpaceData = () => {
       return { success: true as const };
     } catch (error) {
       console.error('Error saving weekly check-in:', error);
-      return { success: false as const, error: 'Failed to save this week’s check-in.' };
+      return { success: false as const, error: "Failed to save this week's check-in." };
     }
   };
 
@@ -753,6 +765,85 @@ export const useRelationshipSpaceData = () => {
     }
   };
 
+  const reportPartner = async (input: {
+    reason: 'fake_identity' | 'pressure' | 'harassment' | 'boundary_violation' | 'unsafe_behavior' | 'other';
+    details?: string;
+  }) => {
+    if (!user?.id || !partner?.id) {
+      return { success: false as const, error: 'No partner available to report.' };
+    }
+
+    try {
+      const { error } = await supabase.from('reports').insert({
+        reporter_user_id: user.id,
+        target_user_id: partner.id,
+        relationship_id: primaryRelationship?.id || null,
+        reason: input.reason,
+        details: input.details?.trim() || null,
+      });
+
+      if (error) throw error;
+      await fetchData();
+      return { success: true as const };
+    } catch (error) {
+      console.error('Error reporting partner:', error);
+      return { success: false as const, error: 'Failed to submit the report.' };
+    }
+  };
+
+  const blockPartner = async () => {
+    if (!user?.id || !partner?.id) {
+      return { success: false as const, error: 'No partner available to block.' };
+    }
+
+    try {
+      const { data: existingBlock, error: existingBlockError } = await supabase
+        .from('blocked_users')
+        .select('id')
+        .eq('blocker_id', user.id)
+        .eq('blocked_id', partner.id)
+        .maybeSingle();
+
+      if (existingBlockError) throw existingBlockError;
+
+      if (!existingBlock) {
+        const { error: blockError } = await supabase.from('blocked_users').insert({
+          blocker_id: user.id,
+          blocked_id: partner.id,
+        });
+
+        if (blockError) throw blockError;
+      }
+
+      if (primaryRelationship) {
+        const { error: relationshipError } = await supabase
+          .from('relationships')
+          .update({
+            lifecycle_state: 'archived',
+            status: 'archived',
+            archived_at: new Date().toISOString(),
+            requested_stage: null,
+            stage_request_status: null,
+            stage_request_from_user_id: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', primaryRelationship.id);
+
+        if (relationshipError) throw relationshipError;
+
+        await createRelationshipEvent(primaryRelationship.id, 'archived', {
+          source: 'block_action',
+        });
+      }
+
+      await fetchData();
+      return { success: true as const };
+    } catch (error) {
+      console.error('Error blocking partner:', error);
+      return { success: false as const, error: 'Failed to block this user.' };
+    }
+  };
+
   return {
     loading,
     relationships,
@@ -765,6 +856,7 @@ export const useRelationshipSpaceData = () => {
     checkins,
     aiSummaries,
     events,
+    reports,
     currentStage,
     nextStage,
     requestIsOpen,
@@ -800,5 +892,7 @@ export const useRelationshipSpaceData = () => {
     updateRelationshipSettings,
     setPausedState,
     archiveRelationship,
+    reportPartner,
+    blockPartner,
   };
 };

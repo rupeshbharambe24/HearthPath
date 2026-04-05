@@ -426,6 +426,64 @@ export type Database = {
           },
         ]
       }
+      reports: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          reason: string
+          relationship_id: string | null
+          reporter_user_id: string
+          status: string
+          target_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          reason: string
+          relationship_id?: string | null
+          reporter_user_id: string
+          status?: string
+          target_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          reason?: string
+          relationship_id?: string | null
+          reporter_user_id?: string
+          status?: string
+          target_user_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_relationship_id_fkey"
+            columns: ["relationship_id"]
+            isOneToOne: false
+            referencedRelation: "relationships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_reporter_user_id_fkey"
+            columns: ["reporter_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       relationship_events: {
         Row: {
           actor_user_id: string | null
@@ -552,6 +610,58 @@ export type Database = {
           {
             foreignKeyName: "relationships_user_b_fkey"
             columns: ["user_b"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      moderation_actions: {
+        Row: {
+          action_type: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          report_id: string | null
+          target_user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          report_id?: string | null
+          target_user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          report_id?: string | null
+          target_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderation_actions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderation_actions_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderation_actions_target_user_id_fkey"
+            columns: ["target_user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]

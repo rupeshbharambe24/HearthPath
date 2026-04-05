@@ -23,9 +23,9 @@ const Interactive = () => {
   const data = useRelationshipSpaceData();
   const {
     incomingRequests, outgoingRequests, primaryRelationship, partner, currentStage, nextStage, requestIsOpen, isExclusive, isPaused,
-    loading, memories, checkins, aiSummaries, events, myPermissions, partnerPermissions, sharedMemoryVaultEnabled, sharedAiEnabled,
+    loading, memories, checkins, aiSummaries, events, reports, myPermissions, partnerPermissions, sharedMemoryVaultEnabled, sharedAiEnabled,
     permissionCatalog, acceptRequest, rejectRequest, sendHeart, requestStageAdvance, respondToStageRequest, setPermissionState,
-    saveCheckin, saveMemory, generateAiSummary, updateRelationshipSettings, setPausedState, archiveRelationship, stageRequestCooldownLabel,
+    saveCheckin, saveMemory, generateAiSummary, updateRelationshipSettings, setPausedState, archiveRelationship, reportPartner, blockPartner, stageRequestCooldownLabel,
   } = data;
   const [rating, setRating] = useState('4');
   const [checkinVisibility, setCheckinVisibility] = useState<'private' | 'shared'>('shared');
@@ -33,6 +33,8 @@ const Interactive = () => {
   const [gratitudeNote, setGratitudeNote] = useState('');
   const [quickGratitude, setQuickGratitude] = useState('');
   const [quickRepair, setQuickRepair] = useState('');
+  const [reportReason, setReportReason] = useState<'fake_identity' | 'pressure' | 'harassment' | 'boundary_violation' | 'unsafe_behavior' | 'other'>('pressure');
+  const [reportDetails, setReportDetails] = useState('');
   const [pacePreference, setPacePreference] = useState<'gentle' | 'steady' | 'deepening'>('steady');
   const [boundaryTopics, setBoundaryTopics] = useState('');
   const [agreementsSummary, setAgreementsSummary] = useState('');
@@ -64,6 +66,7 @@ const Interactive = () => {
   const pulse = useMemo(() => !partner ? [] : buildRelationshipPulse({ currentStage, partnerName: partner.name, trustScore: primaryRelationship?.trust_score || 0, heartsGiven, heartsReceived, memories, checkins }), [checkins, currentStage, heartsGiven, heartsReceived, memories, partner?.name, primaryRelationship?.trust_score]);
   const resurfacedMoments = useMemo(() => !partner ? [] : buildResurfacedMoments({ currentStage, partnerName: partner.name, trustScore: primaryRelationship?.trust_score || 0, heartsGiven, heartsReceived, memories, checkins }), [checkins, currentStage, heartsGiven, heartsReceived, memories, partner?.name, primaryRelationship?.trust_score]);
   const relationshipSignals = useMemo(() => buildRelationshipSignals({ relationship: primaryRelationship, events, memories, checkins }), [checkins, events, memories, primaryRelationship]);
+  const myReports = reports.filter((report) => report.reporter_user_id === user?.id);
 
   const notify = (title: string, description: string, variant?: 'destructive') => toast({ title, description, ...(variant ? { variant } : {}) });
   const act = async (fn: () => Promise<{ success: boolean; error?: string }>, success: string, successBody: string, fail: string) => {
@@ -75,6 +78,30 @@ const Interactive = () => {
     const result = await saveMemory({ memo_text: text.trim(), entry_type, visibility: sharedMemoryVaultEnabled ? 'shared' : 'private' });
     notify(result.success ? `${entry_type === 'gratitude' ? 'Gratitude' : 'Repair'} note saved` : 'Unable to save note', result.success ? 'Your shared space has been updated.' : result.error || 'Please try again.', result.success ? undefined : 'destructive');
     if (result.success) reset();
+  };
+  const handlePermissionToggle = async (permission: HeartPathPermissionName) => {
+    const result = await setPermissionState(permission, !mine(permission));
+    notify(
+      result.success ? 'Permission updated' : 'Unable to update permission',
+      result.success ? 'Access for this relationship has been updated.' : result.error || 'Please try again.',
+      result.success ? undefined : 'destructive'
+    );
+  };
+  const handleGenerateSummary = async (
+    kind: 'monthly_recap' | 'milestone_summary' | 'memory_search',
+    visibility: 'private' | 'shared'
+  ) => {
+    const result = await generateAiSummary({
+      kind,
+      visibility,
+      ...(kind === 'memory_search' ? { query: memorySearchQuery.trim() } : {}),
+    });
+
+    notify(
+      result.success ? 'AI summary ready' : 'Unable to generate summary',
+      result.success ? 'A new assistive summary has been added to this space.' : result.error || 'Please try again.',
+      result.success ? undefined : 'destructive'
+    );
   };
 
   if (loading) {
@@ -118,6 +145,8 @@ const Interactive = () => {
               <MemoryTrail relationshipId={primaryRelationship.id} relationshipLevel={currentStage} canCreateSharedMemories={sharedMemoryVaultEnabled} onCreateMemory={saveMemory} />
               <Card className="romantic-card"><CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-romantic-red" /><span>{isExclusive ? 'Exclusive Home' : 'Assistive AI'}</span></CardTitle></CardHeader><CardContent className="space-y-4">{isExclusive ? <div className="space-y-3"><div className="rounded-xl border border-romantic-red/15 bg-romantic-light-pink/40 p-4 text-sm text-gray-600 dark:bg-romantic-red/10 dark:text-gray-300">This path is exclusive. HeartPath now prioritizes maintenance, memory, gratitude, and agreements instead of discovery.</div><div className="rounded-xl border p-4"><p className="mb-2 text-sm font-medium text-gray-900 dark:text-white">Shared agreements</p><p className="text-sm text-gray-600 dark:text-gray-300">{agreementsSummary || 'No shared agreement summary saved yet.'}</p></div><div className="rounded-xl border p-4"><p className="mb-2 text-sm font-medium text-gray-900 dark:text-white">Recent stage history</p><div className="space-y-2">{events.slice(0, 5).length === 0 ? <p className="text-sm text-gray-500 dark:text-gray-400">Your relationship timeline will appear here.</p> : events.slice(0, 5).map((event) => <div key={event.id} className="flex flex-wrap items-center gap-2"><Badge variant="outline">{event.event_type.replaceAll('_', ' ')}</Badge><span className="text-xs text-gray-500 dark:text-gray-400">{new Date(event.created_at).toLocaleString()}</span></div>)}</div></div></div> : <><div className="rounded-xl border border-romantic-red/15 bg-romantic-light-pink/40 p-4 text-sm text-gray-600 dark:bg-romantic-red/10 dark:text-gray-300">AI here is assistive only. It summarizes saved moments and shared reflections. It does not diagnose or judge the relationship.</div><div className="rounded-xl border p-4 text-sm text-gray-600 dark:text-gray-300"><p className="font-medium text-gray-900 dark:text-white">Shared AI consent</p><p className="mt-2">{sharedAiEnabled ? 'Both partners have granted AI shared recap access. Shared recaps can use shared records only.' : 'Shared AI is currently locked. Both partners must grant AI shared recap access before any shared recap can be generated.'}</p></div><div className="grid gap-2"><Button onClick={() => void handleGenerateSummary('monthly_recap', 'private')} variant="outline">Private monthly recap</Button><Button onClick={() => void handleGenerateSummary('milestone_summary', 'private')} variant="outline">Private milestone summary</Button><Button onClick={() => void handleGenerateSummary('monthly_recap', 'shared')} className="romantic-btn" disabled={!sharedAiEnabled}>Shared monthly recap</Button></div><div className="space-y-2"><Input value={memorySearchQuery} onChange={(event) => setMemorySearchQuery(event.target.value)} placeholder="Search saved moments by theme..." /><Button variant="outline" onClick={() => void handleGenerateSummary('memory_search', 'private')} disabled={!memorySearchQuery.trim()}>Search memory archive</Button></div><div className="space-y-3">{aiSummaries.length === 0 ? <p className="text-sm text-gray-500 dark:text-gray-400">No AI summaries generated yet.</p> : aiSummaries.slice(0, 4).map((summary) => <div key={summary.id} className="space-y-2 rounded-xl border p-3"><div className="flex flex-wrap gap-2"><Badge variant="outline">{summary.summary_kind.replaceAll('_', ' ')}</Badge><Badge variant={summary.visibility === 'shared' ? 'default' : 'secondary'}>{summary.visibility}</Badge></div><h3 className="font-medium text-gray-900 dark:text-white">{summary.title}</h3><p className="whitespace-pre-line text-sm text-gray-500 dark:text-gray-400">{summary.summary}</p><p className="text-xs text-gray-400 dark:text-gray-500">AI-generated summary. Based only on the consented records for this scope.</p></div>)}</div></>}</CardContent></Card>
             </div>
+
+            <Card className="romantic-card"><CardHeader><CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-romantic-red" /><span>Safety & Moderation</span></CardTitle></CardHeader><CardContent className="space-y-4"><div className="rounded-xl border border-romantic-red/15 bg-romantic-light-pink/40 p-4 text-sm text-gray-600 dark:bg-romantic-red/10 dark:text-gray-300">HeartPath records reports and supports blocking. Blocking ends this path from your side and removes future discovery access with that user.</div><div className="grid gap-4 md:grid-cols-[220px_1fr]"><div><p className="mb-2 text-sm font-medium">Report reason</p><Select value={reportReason} onValueChange={(value) => setReportReason(value as typeof reportReason)}><SelectTrigger><SelectValue placeholder="Choose reason" /></SelectTrigger><SelectContent><SelectItem value="fake_identity">Fake identity</SelectItem><SelectItem value="pressure">Pressure</SelectItem><SelectItem value="harassment">Harassment</SelectItem><SelectItem value="boundary_violation">Boundary violation</SelectItem><SelectItem value="unsafe_behavior">Unsafe behavior</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select></div><div><p className="mb-2 text-sm font-medium">Details</p><Textarea value={reportDetails} onChange={(event) => setReportDetails(event.target.value)} placeholder="Describe what happened. Keep it factual." className="min-h-24" /></div></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => void act(() => reportPartner({ reason: reportReason, details: reportDetails }), 'Report submitted', 'Your report has been recorded for review.', 'Unable to submit report')}>Submit report</Button><Button variant="outline" onClick={() => void act(blockPartner, 'User blocked', 'This HeartPath was ended and the user has been blocked from future interaction.', 'Unable to block user')}>Block user</Button></div><div className="space-y-2">{myReports.length === 0 ? <p className="text-sm text-gray-500 dark:text-gray-400">No reports submitted in this relationship.</p> : myReports.slice(0, 3).map((report) => <div key={report.id} className="rounded-xl border p-3"><div className="flex flex-wrap gap-2"><Badge variant="outline">{report.reason.replaceAll('_', ' ')}</Badge><Badge variant="secondary">{report.status}</Badge></div><p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{new Date(report.created_at).toLocaleString()}</p></div>)}</div></CardContent></Card>
 
             <Card className="romantic-card"><CardHeader><CardTitle className="flex items-center gap-2"><LockKeyhole className="h-5 w-5 text-romantic-red" /><span>Pacing, Boundaries, and Agreements</span></CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><div><p className="mb-2 text-sm font-medium">Pace preference</p><Select value={pacePreference} onValueChange={(value) => setPacePreference(value as 'gentle' | 'steady' | 'deepening')}><SelectTrigger><SelectValue placeholder="Choose pace" /></SelectTrigger><SelectContent><SelectItem value="gentle">Gentle</SelectItem><SelectItem value="steady">Steady</SelectItem><SelectItem value="deepening">Deepening</SelectItem></SelectContent></Select></div><div><p className="mb-2 text-sm font-medium">Boundary topics</p><Input value={boundaryTopics} onChange={(event) => setBoundaryTopics(event.target.value)} placeholder="family, intimacy, public visibility" /></div></div><Textarea value={agreementsSummary} onChange={(event) => setAgreementsSummary(event.target.value)} placeholder="Summarize what you both have agreed on so far." className="min-h-24" /><div className="flex flex-wrap gap-2">{sharedMemoryVaultEnabled ? <Badge className="bg-romantic-red text-white">Shared memory vault enabled</Badge> : null}{sharedAiEnabled ? <Badge className="bg-romantic-red text-white">Shared AI recap enabled</Badge> : null}</div><Button onClick={() => void act(() => updateRelationshipSettings({ pace_preference: pacePreference, boundary_topics: boundaryTopics.split(',').map((topic) => topic.trim()).filter(Boolean), agreements_summary: agreementsSummary }), 'HeartPath settings saved', 'Boundaries and agreements are updated.', 'Unable to save settings')} className="romantic-btn">Save HeartPath settings</Button></CardContent></Card>
           </div>
