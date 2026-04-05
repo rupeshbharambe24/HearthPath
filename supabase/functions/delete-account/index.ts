@@ -70,25 +70,25 @@ Deno.serve(async (request) => {
       return json(401, { success: false, error: 'Unable to verify the current user.' });
     }
 
-    const bucket = 'profile-photos';
+    for (const bucket of ['profile-photos', 'verification-documents']) {
+      const { data: storedFiles, error: listError } = await adminClient.storage
+        .from(bucket)
+        .list(user.id, { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
 
-    const { data: storedFiles, error: listError } = await adminClient.storage
-      .from(bucket)
-      .list(user.id, { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
+      if (listError && !listError.message.toLowerCase().includes('not found')) {
+        console.error(`Error listing files in ${bucket}:`, listError);
+        return json(500, { success: false, error: 'Unable to prepare storage cleanup.' });
+      }
 
-    if (listError && !listError.message.toLowerCase().includes('not found')) {
-      console.error('Error listing stored profile files:', listError);
-      return json(500, { success: false, error: 'Unable to prepare storage cleanup.' });
-    }
+      const storagePaths =
+        storedFiles?.filter((item) => item.name && item.name !== '.emptyFolderPlaceholder').map((item) => `${user.id}/${item.name}`) || [];
 
-    const storagePaths =
-      storedFiles?.filter((item) => item.name && item.name !== '.emptyFolderPlaceholder').map((item) => `${user.id}/${item.name}`) || [];
-
-    if (storagePaths.length > 0) {
-      const { error: removeStorageError } = await adminClient.storage.from(bucket).remove(storagePaths);
-      if (removeStorageError) {
-        console.error('Error removing stored profile files:', removeStorageError);
-        return json(500, { success: false, error: 'Unable to remove stored profile files.' });
+      if (storagePaths.length > 0) {
+        const { error: removeStorageError } = await adminClient.storage.from(bucket).remove(storagePaths);
+        if (removeStorageError) {
+          console.error(`Error removing files from ${bucket}:`, removeStorageError);
+          return json(500, { success: false, error: 'Unable to remove stored files.' });
+        }
       }
     }
 
