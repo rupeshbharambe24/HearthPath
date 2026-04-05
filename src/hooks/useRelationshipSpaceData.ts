@@ -677,9 +677,6 @@ export const useRelationshipSpaceData = () => {
         .eq('id', primaryRelationship.id);
 
       if (error) throw error;
-      await createRelationshipEvent(primaryRelationship.id, paused ? 'paused' : 'resumed', {
-        lifecycle_state: paused ? 'paused' : fallbackState,
-      });
       await fetchData();
       return { success: true as const };
     } catch (error) {
