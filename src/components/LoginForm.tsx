@@ -31,7 +31,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup }) => 
             Welcome Back
           </CardTitle>
           <CardDescription>
-            Sign in to find your perfect match
+            Sign in with your approved college email to continue your HeartPath
           </CardDescription>
         </CardHeader>
         <CardContent>

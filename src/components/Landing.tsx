@@ -59,8 +59,8 @@ const Landing: React.FC<LandingProps> = ({ onSignIn, onSignUp }) => {
                   </span>
                 </h1>
                 <p className="text-xl text-gray-600 dark:text-gray-400 max-w-lg mx-auto lg:mx-0">
-                  Connect with fellow students based on personality, interests, and genuine compatibility. 
-                  Your college love story starts here.
+                  Connect with verified college students through a trust-first relationship journey built on privacy,
+                  compatibility, and gradual mutual access.
                 </p>
               </div>
 
@@ -83,15 +83,15 @@ const Landing: React.FC<LandingProps> = ({ onSignIn, onSignUp }) => {
               <div className="pt-8 space-y-4">
                 <div className="flex items-center justify-center lg:justify-start space-x-2 text-sm text-gray-600 dark:text-gray-400">
                   <div className="w-2 h-2 bg-romantic-red rounded-full"></div>
-                  <span>College students only</span>
+                  <span>Approved college emails only</span>
                 </div>
                 <div className="flex items-center justify-center lg:justify-start space-x-2 text-sm text-gray-600 dark:text-gray-400">
                   <div className="w-2 h-2 bg-romantic-red rounded-full"></div>
-                  <span>Privacy-focused matching</span>
+                  <span>Email verification before full access</span>
                 </div>
                 <div className="flex items-center justify-center lg:justify-start space-x-2 text-sm text-gray-600 dark:text-gray-400">
                   <div className="w-2 h-2 bg-romantic-red rounded-full"></div>
-                  <span>Genuine connections</span>
+                  <span>Trust-first profile progression</span>
                 </div>
               </div>
             </div>

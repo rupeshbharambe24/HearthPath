@@ -4,18 +4,48 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { Tables } from '@/integrations/supabase/types';
 import { runSupabaseQuery } from '@/lib/supabase-query';
 import { withTimeout } from '@/lib/async';
+import {
+  buildCompatibilityInsert,
+  buildCompatibilitySnapshot,
+  buildSeriousnessSignals,
+  type CompatibilityResult,
+  type DiscoveryMode,
+} from '@/lib/compatibility';
 
 type ExploreProfile = Tables<'users'>;
+type RelationshipRow = Tables<'relationships'>;
+type BlockedRow = Tables<'blocked_users'>;
 
 const DISCOVERY_BLOCKING_STATES = ['pending', 'active', 'exclusive', 'paused', 'cooldown'] as const;
+const DAILY_INVITATION_LIMIT = 3;
 
 function formatInList(values: string[]) {
   return `(${values.map((value) => `"${value}"`).join(',')})`;
 }
 
+type ExploreSuggestion = ExploreProfile & {
+  compatibility: CompatibilityResult;
+  seriousnessSignals: string[];
+};
+
+function modeAllowsCandidate(viewer: ExploreProfile, candidate: ExploreProfile, mode: DiscoveryMode) {
+  switch (mode) {
+    case 'friendship_first':
+      return candidate.relationship_intent === 'Friendship first';
+    case 'serious_only':
+      return candidate.relationship_intent === 'Serious relationship';
+    case 'same_campus':
+      return Boolean(viewer.college_name && candidate.college_name === viewer.college_name);
+    case 'slow_burn':
+    default:
+      return true;
+  }
+}
+
 async function fetchExploreData(userId: string) {
-  const [relationshipResponse, blockedResponse] = await withTimeout(
+  const [userResponse, relationshipResponse, blockedResponse, actionResponse] = await withTimeout(
     Promise.all([
+      supabase.from('users').select('*').eq('id', userId).single(),
       supabase
         .from('relationships')
         .select('id, user_a, user_b, lifecycle_state, current_stage')
@@ -24,15 +54,23 @@ async function fetchExploreData(userId: string) {
         .from('blocked_users')
         .select('blocker_id, blocked_id')
         .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`),
+      supabase
+        .from('discovery_actions')
+        .select('actor_user_id, target_user_id, action_type, action_date')
+        .eq('actor_user_id', userId),
     ]),
     'Loading discovery prerequisites'
   );
 
+  if (userResponse.error) throw new Error(userResponse.error.message || 'Loading your discovery preferences failed');
   if (relationshipResponse.error) throw new Error(relationshipResponse.error.message || 'Loading discovery relationships failed');
   if (blockedResponse.error) throw new Error(blockedResponse.error.message || 'Loading blocked users failed');
+  if (actionResponse.error) throw new Error(actionResponse.error.message || 'Loading discovery history failed');
 
-  const relationshipRows = relationshipResponse.data || [];
-  const blockedRows = blockedResponse.data || [];
+  const currentUser = userResponse.data as ExploreProfile;
+  const relationshipRows = (relationshipResponse.data || []) as RelationshipRow[];
+  const blockedRows = (blockedResponse.data || []) as BlockedRow[];
+  const actionRows = actionResponse.data || [];
 
   const blockingRelationships = relationshipRows.filter((relationship) =>
     DISCOVERY_BLOCKING_STATES.includes(
@@ -56,21 +94,61 @@ async function fetchExploreData(userId: string) {
     if (blockedRow.blocked_id === userId && blockedRow.blocker_id) excludedUserIds.add(blockedRow.blocker_id);
   });
 
-  let query = supabase
-    .from('users')
-    .select('id, name, college_name, branch, year, hobbies, about, photo_levels')
-    .limit(20);
+  actionRows.forEach((actionRow) => {
+    if (actionRow.target_user_id) {
+      excludedUserIds.add(actionRow.target_user_id);
+    }
+  });
 
+  let query = supabase.from('users').select('*').limit(40);
   const excludedList = Array.from(excludedUserIds);
   if (excludedList.length > 0) {
     query = query.not('id', 'in', formatInList(excludedList));
   }
 
   const profileResponse = await runSupabaseQuery(query, 'Loading discovery profiles');
+  const discoveryMode = (currentUser.discovery_mode || 'slow_burn') as DiscoveryMode;
+
+  const profiles = ((profileResponse.data || []) as ExploreProfile[])
+    .filter((candidate) => candidate.access_state === 'active')
+    .filter((candidate) => modeAllowsCandidate(currentUser, candidate, discoveryMode));
+
+  const suggestions: ExploreSuggestion[] = profiles
+    .map((candidate) => ({
+      ...candidate,
+      compatibility: buildCompatibilitySnapshot(currentUser, candidate, discoveryMode),
+      seriousnessSignals: buildSeriousnessSignals(candidate),
+    }))
+    .sort((left, right) => {
+      if (right.compatibility.score !== left.compatibility.score) {
+        return right.compatibility.score - left.compatibility.score;
+      }
+
+      return (right.profile_completeness || 0) - (left.profile_completeness || 0);
+    })
+    .slice(0, 6);
+
+  if (suggestions.length > 0) {
+    const snapshotPayload = suggestions.map((candidate) =>
+      buildCompatibilityInsert(currentUser.id, candidate.id, discoveryMode, candidate.compatibility)
+    );
+
+    void supabase.from('compatibility_snapshots').upsert(snapshotPayload, {
+      onConflict: 'viewer_user_id,candidate_user_id,discovery_mode',
+    });
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const invitesSentToday = actionRows.filter(
+    (actionRow) => actionRow.action_type === 'invite_sent' && actionRow.action_date === today
+  ).length;
 
   return {
-    profiles: (profileResponse.data || []) as ExploreProfile[],
+    profiles: suggestions,
     discoveryLocked,
+    discoveryMode,
+    invitesSentToday,
+    invitationsRemaining: Math.max(0, DAILY_INVITATION_LIMIT - invitesSentToday),
   };
 }
 
@@ -84,38 +162,104 @@ export const useExploreData = () => {
     enabled: !!user?.id,
   });
 
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['explore-data', user?.id] });
+
+  const updateModeMutation = useMutation({
+    mutationFn: async (mode: DiscoveryMode) => {
+      if (!user?.id) throw new Error('Not authenticated');
+      await runSupabaseQuery(
+        supabase.from('users').update({ discovery_mode: mode }).eq('id', user.id),
+        'Updating discovery mode'
+      );
+      return mode;
+    },
+    onSuccess: () => {
+      void invalidate();
+    },
+  });
+
   const sendRequestMutation = useMutation({
     mutationFn: async (targetUserId: string) => {
       if (!user?.id) throw new Error('Not authenticated');
       if (query.data?.discoveryLocked) {
         throw new Error('Discovery is locked while you are in an exclusive HeartPath.');
       }
+      if ((query.data?.invitationsRemaining || 0) <= 0) {
+        throw new Error('You have reached today’s HeartPath invitation limit. Come back tomorrow for a fresh batch.');
+      }
+
+      const insertResponse = await runSupabaseQuery(
+        supabase
+          .from('relationships')
+          .insert({
+            user_a: user.id,
+            user_b: targetUserId,
+            lifecycle_state: 'pending',
+            status: 'pending',
+            current_stage: 1,
+            current_level: 1,
+            hearts_a2b: 0,
+            hearts_b2a: 0,
+            trust_score: 0,
+          })
+          .select('id')
+          .single(),
+        'Sending HeartPath request'
+      );
 
       await runSupabaseQuery(
-        supabase.from('relationships').insert({
-          user_a: user.id,
-          user_b: targetUserId,
-          lifecycle_state: 'pending',
-          status: 'pending',
-          current_stage: 1,
-          current_level: 1,
-          hearts_a2b: 0,
-          hearts_b2a: 0,
-          trust_score: 0,
+        supabase.from('discovery_actions').insert({
+          actor_user_id: user.id,
+          target_user_id: targetUserId,
+          action_type: 'invite_sent',
+          metadata: {
+            discovery_mode: query.data?.discoveryMode || 'slow_burn',
+          },
         }),
-        'Sending HeartPath request'
+        'Recording discovery invite',
+        8000
+      );
+
+      if (insertResponse.data?.id) {
+        void supabase.from('relationship_events').insert({
+          relationship_id: insertResponse.data.id,
+          actor_user_id: user.id,
+          event_type: 'request_received',
+          metadata: {
+            source: 'curated_discovery',
+            discovery_mode: query.data?.discoveryMode || 'slow_burn',
+          },
+        });
+      }
+
+      return targetUserId;
+    },
+    onSuccess: () => {
+      void invalidate();
+    },
+  });
+
+  const dismissMutation = useMutation({
+    mutationFn: async (targetUserId: string) => {
+      if (!user?.id) throw new Error('Not authenticated');
+
+      await runSupabaseQuery(
+        supabase.from('discovery_actions').insert({
+          actor_user_id: user.id,
+          target_user_id: targetUserId,
+          action_type: 'pass',
+          metadata: {
+            discovery_mode: query.data?.discoveryMode || 'slow_burn',
+          },
+        }),
+        'Saving discovery pass',
+        8000
       );
 
       return targetUserId;
     },
-    onSuccess: (targetUserId) => {
-      queryClient.setQueryData(['explore-data', user?.id], (previous: { profiles: ExploreProfile[]; discoveryLocked: boolean } | undefined) => {
-        if (!previous) return previous;
-        return {
-          ...previous,
-          profiles: previous.profiles.filter((profile) => profile.id !== targetUserId),
-        };
-      });
+    onSuccess: () => {
+      void invalidate();
     },
   });
 
@@ -129,11 +273,36 @@ export const useExploreData = () => {
     }
   };
 
+  const dismissSuggestion = async (targetUserId: string) => {
+    try {
+      await dismissMutation.mutateAsync(targetUserId);
+      return { success: true as const };
+    } catch (error: any) {
+      console.error('Error saving discovery pass:', error);
+      return { success: false as const, error: error.message || 'Failed to pass on this suggestion' };
+    }
+  };
+
+  const updateDiscoveryMode = async (mode: DiscoveryMode) => {
+    try {
+      await updateModeMutation.mutateAsync(mode);
+      return { success: true as const };
+    } catch (error: any) {
+      console.error('Error updating discovery mode:', error);
+      return { success: false as const, error: error.message || 'Failed to update discovery mode' };
+    }
+  };
+
   return {
     profiles: query.data?.profiles || [],
     loading: query.isLoading,
     error: query.error ? 'Failed to load profiles' : null,
     discoveryLocked: query.data?.discoveryLocked || false,
+    discoveryMode: (query.data?.discoveryMode || 'slow_burn') as DiscoveryMode,
+    invitesSentToday: query.data?.invitesSentToday || 0,
+    invitationsRemaining: query.data?.invitationsRemaining || DAILY_INVITATION_LIMIT,
     sendChatRequest,
+    dismissSuggestion,
+    updateDiscoveryMode,
   };
 };

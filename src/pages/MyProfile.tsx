@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar';
 import PhotoManager from '@/components/PhotoManager';
 import LevelPreview from '@/components/LevelPreview';
 import EditableField from '@/components/EditableField';
+import VerificationStatusCard from '@/components/VerificationStatusCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { User, Camera, Eye } from 'lucide-react';
@@ -17,7 +18,7 @@ const MyProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [previewLevel, setPreviewLevel] = useState(1);
   const [saving, setSaving] = useState(false);
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { profile, loading } = useUserData();
   const { toast } = useToast();
 
@@ -79,6 +80,7 @@ const MyProfile = () => {
         description: "Your changes have been saved successfully.",
       });
 
+      await refreshUser();
       setIsEditing(false);
     } catch (error) {
       console.error('Error in handleSave:', error);
@@ -122,6 +124,17 @@ const MyProfile = () => {
                 Manage your profile and privacy settings
               </p>
             </div>
+
+            {user ? (
+              <div className="mb-8">
+                <VerificationStatusCard
+                  profileCompleteness={user.profileCompleteness}
+                  verificationBadges={user.verificationBadges}
+                  title="Verification Status"
+                  description="Verified access and profile completeness help HeartPath stay college-only and trust-first."
+                />
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Profile Information */}

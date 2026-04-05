@@ -3,6 +3,17 @@ import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { withTimeout } from '@/lib/async';
+import {
+  clampProfileCompleteness,
+  DEFAULT_VERIFICATION_BADGES,
+  normalizeAccessState,
+  normalizeOnboardingStep,
+  normalizeVerificationBadges,
+  type AccessState,
+  type OnboardingStep,
+  type VerificationBadges,
+} from '@/lib/access-state';
+import type { Tables } from '@/integrations/supabase/types';
 
 interface AuthUser {
   id: string;
@@ -15,7 +26,10 @@ interface AuthUser {
   trustScore?: number;
   heartsGiven?: number;
   heartsReceived?: number;
-  needsOnboarding?: boolean;
+  accessState: AccessState;
+  onboardingStep: OnboardingStep;
+  profileCompleteness: number;
+  verificationBadges: VerificationBadges;
 }
 
 interface SignupData {
@@ -28,41 +42,71 @@ interface SignupData {
   photo: File | null;
 }
 
+interface SignupResult {
+  email: string;
+  needsEmailConfirmation: boolean;
+}
+
 interface AuthContextType {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (data: SignupData) => Promise<void>;
+  signup: (data: SignupData) => Promise<SignupResult>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  resendVerificationEmail: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+type UserRow = Tables<'users'>;
+
+function buildAuthUser(authUser: User, profile: UserRow | null): AuthUser {
+  return {
+    id: authUser.id,
+    name: profile?.name || authUser.user_metadata?.name || '',
+    email: authUser.email || profile?.college_email || '',
+    college: profile?.college_name || undefined,
+    branch: profile?.branch || undefined,
+    year: profile?.year || undefined,
+    relationshipLevel: 1,
+    trustScore: 75,
+    heartsGiven: 0,
+    heartsReceived: 0,
+    accessState: normalizeAccessState(profile?.access_state),
+    onboardingStep: normalizeOnboardingStep(profile?.onboarding_step),
+    profileCompleteness: clampProfileCompleteness(profile?.profile_completeness),
+    verificationBadges: normalizeVerificationBadges(profile?.verification_badges),
+  };
+}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
+  const syncAccessState = async (): Promise<UserRow | null> => {
+    const { data, error } = await withTimeout(
+      supabase.rpc('sync_user_access_state'),
+      8000,
+      'Syncing HeartPath access state'
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  };
+
   const loadUserProfile = async (authUser: User) => {
-    let profile = null;
     let retries = 3;
+    let profile: UserRow | null = null;
 
     while (retries > 0) {
       try {
-        const { data, error } = await withTimeout(
-          supabase
-            .from('users')
-            .select('*')
-            .eq('id', authUser.id)
-            .maybeSingle(),
-          8000,
-          'Loading user profile'
-        );
-
-        if (error) throw error;
-        profile = data;
+        profile = await syncAccessState();
         break;
       } catch (error) {
         retries -= 1;
@@ -74,21 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    const needsOnboarding = !profile || !profile.name || !profile.college_name;
-
-    setUser({
-      id: authUser.id,
-      name: profile?.name || authUser.user_metadata?.name || '',
-      email: authUser.email || '',
-      college: profile?.college_name,
-      branch: profile?.branch,
-      year: profile?.year,
-      relationshipLevel: 1,
-      trustScore: 75,
-      heartsGiven: 0,
-      heartsReceived: 0,
-      needsOnboarding,
-    });
+    setUser(buildAuthUser(authUser, profile));
   };
 
   const refreshUser = async () => {
@@ -196,6 +226,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
 
+      const domainCheck = await withTimeout(
+        supabase.rpc('check_college_email_domain', { email: data.email }),
+        8000,
+        'Checking college email eligibility'
+      );
+
+      if (domainCheck.error) {
+        throw domainCheck.error;
+      }
+
+      const domainResult = domainCheck.data?.[0];
+      if (!domainResult?.approved) {
+        const message = domainResult?.domain
+          ? `HeartPath currently supports approved college domains only. ${domainResult.domain} is not in the allowlist yet.`
+          : 'Please use an approved college email address to join HeartPath.';
+        throw new Error(message);
+      }
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
@@ -209,18 +257,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (authData.user) {
         toast({
-          title: authData.session ? 'Account created' : 'Account created',
+          title: authData.session ? 'Account created' : 'Check your college email',
           description: authData.session
-            ? 'Please complete your profile to start connecting.'
-            : 'Please confirm your email, then sign in to continue.',
+            ? 'Please complete your verification and profile to activate HeartPath.'
+            : 'We sent a confirmation link to your approved college email. Verify it to continue.',
         });
       }
+
+      return {
+        email: data.email,
+        needsEmailConfirmation: !authData.session,
+      };
     } catch (error: any) {
       console.error('Signup error:', error);
 
       let errorMessage = 'Failed to create account. Please try again.';
       if (error.message?.includes('already registered')) {
         errorMessage = 'An account with this email already exists. Please sign in instead.';
+      } else if (error.message?.includes('approved college domains only')) {
+        errorMessage = error.message;
       }
 
       toast({
@@ -232,6 +287,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const resendVerificationEmail = async (email: string) => {
+    const { error } = await withTimeout(
+      supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/onboarding`,
+        },
+      }),
+      8000,
+      'Resending verification email'
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    toast({
+      title: 'Verification email sent',
+      description: 'Check your college inbox for a fresh confirmation link.',
+    });
   };
 
   const logout = async () => {
@@ -264,6 +342,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signup,
         logout,
         refreshUser,
+        resendVerificationEmail,
       }}
     >
       {children}

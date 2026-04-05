@@ -3,14 +3,21 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Compass, MessageSquare, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { canAccessProtectedArea } from '@/lib/access-state';
 
 const MobileNav = () => {
+  const { user } = useAuth();
   const menuItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Explore', path: '/explore', icon: Compass },
     { name: 'Chat', path: '/chat', icon: MessageSquare },
     { name: 'Settings', path: '/settings', icon: Settings },
   ];
+
+  if (!user || !canAccessProtectedArea(user.accessState)) {
+    return null;
+  }
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-romantic-dark-bg border-t border-gray-200 dark:border-gray-700 z-50">

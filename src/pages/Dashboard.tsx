@@ -4,6 +4,7 @@ import { Navigate } from 'react-router-dom';
 import AppLayout from '@/components/AppLayout';
 import Sidebar from '@/components/Sidebar';
 import DashboardStats from '@/components/DashboardStats';
+import VerificationStatusCard from '@/components/VerificationStatusCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDashboardData } from '@/hooks/useDashboardData';
 
@@ -52,6 +53,17 @@ const Dashboard = () => {
               </p>
             </div>
             
+            {user ? (
+              <div className="mb-8">
+                <VerificationStatusCard
+                  profileCompleteness={user.profileCompleteness}
+                  verificationBadges={user.verificationBadges}
+                  title="Trust Status"
+                  description="Your verified access and profile readiness are part of how HeartPath builds safer connections."
+                />
+              </div>
+            ) : null}
+
             <DashboardStats userStats={stats} />
             
             {stats.totalMatches === 0 && (

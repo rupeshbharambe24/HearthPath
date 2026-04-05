@@ -87,3 +87,8 @@ npm run supabase:restore-backup -- path/to/your-backup.backup.gz
 ```
 
 The detailed recovery workflow is documented in [docs/supabase-recovery.md](./docs/supabase-recovery.md).
+
+## HeartPath planning docs
+
+- [Phase 1 implementation plan](./docs/heartpath-phase-1-implementation.md)
+- [College domain allowlist runbook](./docs/college-domain-allowlist.md)

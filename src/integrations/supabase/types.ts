@@ -35,6 +35,126 @@ export type Database = {
         }
         Relationships: []
       }
+      college_domains: {
+        Row: {
+          college_name: string
+          created_at: string
+          domain: string
+          id: string
+          status: string
+        }
+        Insert: {
+          college_name: string
+          created_at?: string
+          domain: string
+          id?: string
+          status?: string
+        }
+        Update: {
+          college_name?: string
+          created_at?: string
+          domain?: string
+          id?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      compatibility_snapshots: {
+        Row: {
+          candidate_user_id: string
+          compatibility_score: number
+          computed_at: string
+          discovery_mode: string
+          id: string
+          rationale: string[]
+          score_band: string
+          shared_values: string[]
+          viewer_user_id: string
+        }
+        Insert: {
+          candidate_user_id: string
+          compatibility_score: number
+          computed_at?: string
+          discovery_mode: string
+          id?: string
+          rationale?: string[]
+          score_band: string
+          shared_values?: string[]
+          viewer_user_id: string
+        }
+        Update: {
+          candidate_user_id?: string
+          compatibility_score?: number
+          computed_at?: string
+          discovery_mode?: string
+          id?: string
+          rationale?: string[]
+          score_band?: string
+          shared_values?: string[]
+          viewer_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compatibility_snapshots_candidate_user_id_fkey"
+            columns: ["candidate_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compatibility_snapshots_viewer_user_id_fkey"
+            columns: ["viewer_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discovery_actions: {
+        Row: {
+          action_date: string
+          action_type: string
+          actor_user_id: string
+          created_at: string
+          id: string
+          metadata: Json
+          target_user_id: string
+        }
+        Insert: {
+          action_date?: string
+          action_type: string
+          actor_user_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          target_user_id: string
+        }
+        Update: {
+          action_date?: string
+          action_type?: string
+          actor_user_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          target_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discovery_actions_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovery_actions_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_summaries: {
         Row: {
           consent_scope: string | null
@@ -306,6 +426,48 @@ export type Database = {
           },
         ]
       }
+      relationship_events: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json
+          relationship_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          relationship_id: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          relationship_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relationship_events_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "relationship_events_relationship_id_fkey"
+            columns: ["relationship_id"]
+            isOneToOne: false
+            referencedRelation: "relationships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       relationships: {
         Row: {
           agreements_summary: string | null
@@ -447,41 +609,145 @@ export type Database = {
           },
         ]
       }
+      user_verifications: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json
+          status: string
+          user_id: string
+          verification_type: string
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json
+          status?: string
+          user_id: string
+          verification_type: string
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json
+          status?: string
+          user_id?: string
+          verification_type?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_verifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
+          access_state: string | null
           about: string | null
           branch: string | null
+          boundary_topics: string[] | null
+          campus_zone: string | null
           college_email: string
           college_name: string | null
+          communication_style: string | null
           created_at: string | null
+          deal_breakers: string[] | null
+          discovery_mode: string | null
+          email_verified_at: string | null
+          heartpath_norms_acknowledged_at: string | null
           hobbies: string[] | null
           id: string
+          languages: string[] | null
+          lifestyle_preferences: string[] | null
           name: string
+          onboarding_completed_at: string | null
+          onboarding_step: string | null
+          pace_style: string | null
           photo_levels: Json | null
+          preferred_chat_frequency: string | null
+          privacy_comfort: string | null
+          profile_completeness: number | null
+          pronouns: string | null
+          relationship_intent: string | null
+          student_verified_at: string | null
+          value_tags: string[] | null
+          verification_badges: Json | null
+          voice_notes_comfort: string | null
           year: number | null
         }
         Insert: {
+          access_state?: string | null
           about?: string | null
           branch?: string | null
+          boundary_topics?: string[] | null
+          campus_zone?: string | null
           college_email: string
           college_name?: string | null
+          communication_style?: string | null
           created_at?: string | null
+          deal_breakers?: string[] | null
+          discovery_mode?: string | null
+          email_verified_at?: string | null
+          heartpath_norms_acknowledged_at?: string | null
           hobbies?: string[] | null
           id: string
+          languages?: string[] | null
+          lifestyle_preferences?: string[] | null
           name: string
+          onboarding_completed_at?: string | null
+          onboarding_step?: string | null
+          pace_style?: string | null
           photo_levels?: Json | null
+          preferred_chat_frequency?: string | null
+          privacy_comfort?: string | null
+          profile_completeness?: number | null
+          pronouns?: string | null
+          relationship_intent?: string | null
+          student_verified_at?: string | null
+          value_tags?: string[] | null
+          verification_badges?: Json | null
+          voice_notes_comfort?: string | null
           year?: number | null
         }
         Update: {
+          access_state?: string | null
           about?: string | null
           branch?: string | null
+          boundary_topics?: string[] | null
+          campus_zone?: string | null
           college_email?: string
           college_name?: string | null
+          communication_style?: string | null
           created_at?: string | null
+          deal_breakers?: string[] | null
+          discovery_mode?: string | null
+          email_verified_at?: string | null
+          heartpath_norms_acknowledged_at?: string | null
           hobbies?: string[] | null
           id?: string
+          languages?: string[] | null
+          lifestyle_preferences?: string[] | null
           name?: string
+          onboarding_completed_at?: string | null
+          onboarding_step?: string | null
+          pace_style?: string | null
           photo_levels?: Json | null
+          preferred_chat_frequency?: string | null
+          privacy_comfort?: string | null
+          profile_completeness?: number | null
+          pronouns?: string | null
+          relationship_intent?: string | null
+          student_verified_at?: string | null
+          value_tags?: string[] | null
+          verification_badges?: Json | null
+          voice_notes_comfort?: string | null
           year?: number | null
         }
         Relationships: []
@@ -491,7 +757,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_college_email_domain: {
+        Args: {
+          email: string
+        }
+        Returns: {
+          approved: boolean
+          college_name: string | null
+          domain: string | null
+          normalized_email: string | null
+        }[]
+      }
+      sync_user_access_state: {
+        Args: Record<PropertyKey, never>
+        Returns: Database["public"]["Tables"]["users"]["Row"]
+      }
     }
     Enums: {
       [_ in never]: never

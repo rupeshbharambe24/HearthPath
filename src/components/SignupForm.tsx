@@ -65,10 +65,13 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, onSwitchToLogin }) =>
             Join HeartPath
           </CardTitle>
           <CardDescription>
-            Create your account to start connecting
+            Use your approved college email to begin verified access
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 rounded-xl border border-romantic-pink/30 bg-romantic-light-pink/60 p-3 text-sm text-gray-700 dark:border-romantic-red/20 dark:bg-romantic-red/10 dark:text-gray-200">
+            HeartPath is currently limited to approved college email domains. You will verify your email before the app unlocks.
+          </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
