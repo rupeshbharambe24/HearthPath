@@ -20,6 +20,7 @@ const Chat = lazy(() => import("./pages/Chat"));
 const Settings = lazy(() => import("./pages/Settings"));
 const MyProfile = lazy(() => import("./pages/MyProfile"));
 const Interactive = lazy(() => import("./pages/Interactive"));
+const AdminVerifications = lazy(() => import("./pages/AdminVerifications"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -98,6 +99,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <Interactive />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/verifications"
+                  element={
+                    <ProtectedRoute>
+                      <AdminVerifications />
                     </ProtectedRoute>
                   }
                 />

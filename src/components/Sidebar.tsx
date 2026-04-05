@@ -5,6 +5,7 @@ import { Heart, MessageSquare, Search, User, Settings, LogOut } from 'lucide-rea
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { isHeartPathAdmin } from '@/lib/admin';
 
 const Sidebar = () => {
   const location = useLocation();
@@ -27,7 +28,7 @@ const Sidebar = () => {
     { name: 'My Profile', href: '/profile', icon: User },
     { name: 'Interactive', href: '/interactive', icon: Heart },
     { name: 'Settings', href: '/settings', icon: Settings },
-  ];
+  ].concat(isHeartPathAdmin(user?.email) ? [{ name: 'Verification Review', href: '/admin/verifications', icon: Settings }] : []);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-romantic-dark-bg border-r border-gray-200 dark:border-gray-700 transform -translate-x-full lg:translate-x-0 transition-transform duration-200 ease-in-out">
