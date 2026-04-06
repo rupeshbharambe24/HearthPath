@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import AppLayout from '@/components/AppLayout';
-import Sidebar from '@/components/Sidebar';
+import AuthenticatedLayout from '@/components/AuthenticatedLayout';
 import MemoryTrail from '@/components/MemoryTrail';
 import RelationshipBadge from '@/components/RelationshipBadge';
 import { Badge } from '@/components/ui/badge';
@@ -105,22 +104,20 @@ const Interactive = () => {
   };
 
   if (loading) {
-    return <AppLayout><div className="flex min-h-screen bg-gray-50 dark:bg-romantic-dark-bg"><Sidebar /><main className="flex-1 p-6 lg:ml-64"><div className="mx-auto max-w-6xl animate-pulse space-y-6"><div className="h-8 w-1/3 rounded bg-gray-200 dark:bg-gray-700" /><div className="grid gap-6 lg:grid-cols-2"><div className="h-52 rounded bg-gray-200 dark:bg-gray-700" /><div className="h-52 rounded bg-gray-200 dark:bg-gray-700" /></div></div></main></div></AppLayout>;
+    return <AuthenticatedLayout><div className="p-6"><div className="mx-auto max-w-6xl animate-pulse space-y-6"><div className="h-8 w-1/3 rounded bg-gray-200 dark:bg-gray-700" /><div className="grid gap-6 lg:grid-cols-2"><div className="h-52 rounded bg-gray-200 dark:bg-gray-700" /><div className="h-52 rounded bg-gray-200 dark:bg-gray-700" /></div></div></div></AuthenticatedLayout>;
   }
 
   if (!primaryRelationship) {
     return (
-      <AppLayout>
-        <div className="flex min-h-screen bg-gray-50 dark:bg-romantic-dark-bg"><Sidebar /><main className="flex-1 p-6 lg:ml-64"><div className="mx-auto max-w-6xl space-y-6"><div><h1 className="mb-2 text-3xl font-bold text-gray-900 dark:text-white">HeartPath Shared Space</h1><p className="text-gray-600 dark:text-gray-400">Mutual trust, gradual access, shared reflection, and consented growth all live here.</p></div><div className="grid gap-6 lg:grid-cols-2"><Card className="romantic-card"><CardHeader><CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-romantic-red" /><span>Incoming Requests</span></CardTitle></CardHeader><CardContent className="space-y-4">{incomingRequests.length === 0 ? <p className="text-sm text-gray-500 dark:text-gray-400">No pending requests right now. Explore HeartPath to start something new.</p> : incomingRequests.map((request) => <div key={request.id} className="space-y-3 rounded-xl border p-4"><div><h3 className="font-medium text-gray-900 dark:text-white">{request.partner?.name || 'New request'}</h3><p className="text-sm text-gray-500 dark:text-gray-400">{request.partner?.college_name || 'Unknown college'}</p></div><div className="flex gap-2"><Button onClick={() => void act(() => acceptRequest(request.id), 'Request accepted', 'Your HeartPath is active now.', 'Unable to update request')} className="romantic-btn flex-1">Accept</Button><Button variant="outline" onClick={() => void act(() => rejectRequest(request.id), 'Request declined', 'The request was archived.', 'Unable to update request')} className="flex-1">Decline</Button></div></div>)}</CardContent></Card><Card className="romantic-card"><CardHeader><CardTitle className="flex items-center gap-2"><ArrowUpRight className="h-5 w-5 text-romantic-red" /><span>Outgoing Requests</span></CardTitle></CardHeader><CardContent className="space-y-4">{outgoingRequests.length === 0 ? <p className="text-sm text-gray-500 dark:text-gray-400">No requests pending from your side right now.</p> : outgoingRequests.map((request) => <div key={request.id} className="rounded-xl border p-4"><h3 className="font-medium text-gray-900 dark:text-white">{request.partner?.name || 'Pending request'}</h3><p className="text-sm text-gray-500 dark:text-gray-400">Waiting for them to decide whether to start a HeartPath with you.</p></div>)}</CardContent></Card></div></div></main></div>
-      </AppLayout>
+      <AuthenticatedLayout>
+        <div className="p-6"><div className="mx-auto max-w-6xl space-y-6"><div><h1 className="mb-2 text-3xl font-bold text-gray-900 dark:text-white">HeartPath Shared Space</h1><p className="text-gray-600 dark:text-gray-400">Mutual trust, gradual access, shared reflection, and consented growth all live here.</p></div><div className="grid gap-6 lg:grid-cols-2"><Card className="romantic-card"><CardHeader><CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-romantic-red" /><span>Incoming Requests</span></CardTitle></CardHeader><CardContent className="space-y-4">{incomingRequests.length === 0 ? <p className="text-sm text-gray-500 dark:text-gray-400">No pending requests right now. Explore HeartPath to start something new.</p> : incomingRequests.map((request) => <div key={request.id} className="space-y-3 rounded-xl border p-4"><div><h3 className="font-medium text-gray-900 dark:text-white">{request.partner?.name || 'New request'}</h3><p className="text-sm text-gray-500 dark:text-gray-400">{request.partner?.college_name || 'Unknown college'}</p></div><div className="flex gap-2"><Button onClick={() => void act(() => acceptRequest(request.id), 'Request accepted', 'Your HeartPath is active now.', 'Unable to update request')} className="romantic-btn flex-1">Accept</Button><Button variant="outline" onClick={() => void act(() => rejectRequest(request.id), 'Request declined', 'The request was archived.', 'Unable to update request')} className="flex-1">Decline</Button></div></div>)}</CardContent></Card><Card className="romantic-card"><CardHeader><CardTitle className="flex items-center gap-2"><ArrowUpRight className="h-5 w-5 text-romantic-red" /><span>Outgoing Requests</span></CardTitle></CardHeader><CardContent className="space-y-4">{outgoingRequests.length === 0 ? <p className="text-sm text-gray-500 dark:text-gray-400">No requests pending from your side right now.</p> : outgoingRequests.map((request) => <div key={request.id} className="rounded-xl border p-4"><h3 className="font-medium text-gray-900 dark:text-white">{request.partner?.name || 'Pending request'}</h3><p className="text-sm text-gray-500 dark:text-gray-400">Waiting for them to decide whether to start a HeartPath with you.</p></div>)}</CardContent></Card></div></div></div>
+      </AuthenticatedLayout>
     );
   }
 
   return (
-    <AppLayout>
-      <div className="flex min-h-screen bg-gray-50 dark:bg-romantic-dark-bg">
-        <Sidebar />
-        <main className="flex-1 p-6 lg:ml-64">
+    <AuthenticatedLayout>
+      <div className="p-6">
           <div className="mx-auto max-w-6xl space-y-6">
             <div><h1 className="mb-2 text-3xl font-bold text-gray-900 dark:text-white">{isExclusive ? 'HeartPath Home' : 'HeartPath Shared Space'}</h1><p className="text-gray-600 dark:text-gray-400">{isExclusive ? 'Discovery is locked. This space is now centered on your relationship, memories, and rituals.' : 'Mutual trust, gradual access, shared reflection, and consented growth all live here.'}</p></div>
 
@@ -150,9 +147,8 @@ const Interactive = () => {
 
             <Card className="romantic-card"><CardHeader><CardTitle className="flex items-center gap-2"><LockKeyhole className="h-5 w-5 text-romantic-red" /><span>Pacing, Boundaries, and Agreements</span></CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><div><p className="mb-2 text-sm font-medium">Pace preference</p><Select value={pacePreference} onValueChange={(value) => setPacePreference(value as 'gentle' | 'steady' | 'deepening')}><SelectTrigger><SelectValue placeholder="Choose pace" /></SelectTrigger><SelectContent><SelectItem value="gentle">Gentle</SelectItem><SelectItem value="steady">Steady</SelectItem><SelectItem value="deepening">Deepening</SelectItem></SelectContent></Select></div><div><p className="mb-2 text-sm font-medium">Boundary topics</p><Input value={boundaryTopics} onChange={(event) => setBoundaryTopics(event.target.value)} placeholder="family, intimacy, public visibility" /></div></div><Textarea value={agreementsSummary} onChange={(event) => setAgreementsSummary(event.target.value)} placeholder="Summarize what you both have agreed on so far." className="min-h-24" /><div className="flex flex-wrap gap-2">{sharedMemoryVaultEnabled ? <Badge className="bg-romantic-red text-white">Shared memory vault enabled</Badge> : null}{sharedAiEnabled ? <Badge className="bg-romantic-red text-white">Shared AI recap enabled</Badge> : null}</div><Button onClick={() => void act(() => updateRelationshipSettings({ pace_preference: pacePreference, boundary_topics: boundaryTopics.split(',').map((topic) => topic.trim()).filter(Boolean), agreements_summary: agreementsSummary }), 'HeartPath settings saved', 'Boundaries and agreements are updated.', 'Unable to save settings')} className="romantic-btn">Save HeartPath settings</Button></CardContent></Card>
           </div>
-        </main>
       </div>
-    </AppLayout>
+    </AuthenticatedLayout>
   );
 };
 

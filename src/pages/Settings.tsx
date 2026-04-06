@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
-import AppLayout from '@/components/AppLayout';
-import Sidebar from '@/components/Sidebar';
+import AuthenticatedLayout from '@/components/AuthenticatedLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Settings as SettingsIcon, Heart, Shield, Users, User } from 'lucide-react';
 import ThemeControls from '@/components/ThemeControls';
@@ -11,10 +10,8 @@ import AccountActions from '@/components/AccountActions';
 
 const Settings = () => {
   return (
-    <AppLayout>
-      <div className="flex min-h-screen bg-gray-50 dark:bg-romantic-dark-bg">
-        <Sidebar />
-        <main className="flex-1 lg:ml-64 p-6">
+    <AuthenticatedLayout>
+      <div className="p-6">
           <div className="max-w-4xl mx-auto">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
@@ -79,9 +76,8 @@ const Settings = () => {
               </Card>
             </div>
           </div>
-        </main>
       </div>
-    </AppLayout>
+    </AuthenticatedLayout>
   );
 };
 

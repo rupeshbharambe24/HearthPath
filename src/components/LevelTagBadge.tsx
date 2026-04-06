@@ -1,8 +1,9 @@
-
 import React from 'react';
+import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { getStageName } from '@/lib/heartpath';
+import { getLevelPulse } from '@/lib/animations';
 
 interface LevelTagBadgeProps {
   level: number;
@@ -21,10 +22,19 @@ const LevelTagBadge: React.FC<LevelTagBadgeProps> = ({ level }) => {
     }
   };
 
+  const pulseVariants = getLevelPulse(level);
+
   return (
-    <Badge className={cn('text-xs font-medium', getLevelColor(level))}>
-      Level {level}: {getStageName(level)}
-    </Badge>
+    <motion.div
+      variants={pulseVariants}
+      initial="initial"
+      animate="animate"
+      className="inline-block"
+    >
+      <Badge className={cn('text-xs font-medium transition-all duration-300', getLevelColor(level))}>
+        Level {level}: {getStageName(level)}
+      </Badge>
+    </motion.div>
   );
 };
 

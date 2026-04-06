@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -28,24 +28,24 @@
   }
 
   .dark {
-    --background: 0 0% 10%;
+    --background: 0 0% 7%;
     --foreground: 210 40% 98%;
-    --card: 0 0% 16%;
+    --card: 0 0% 11%;
     --card-foreground: 210 40% 98%;
-    --popover: 0 0% 16%;
+    --popover: 0 0% 11%;
     --popover-foreground: 210 40% 98%;
     --primary: 354 70% 54%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 20%;
+    --secondary: 0 0% 15%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 0 0% 20%;
+    --muted: 0 0% 15%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 0 0% 20%;
+    --accent: 0 0% 15%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
     --ring: 354 70% 54%;
   }
 
@@ -54,28 +54,97 @@
   }
 
   body {
-    @apply bg-background text-foreground font-romantic;
+    @apply bg-background text-foreground font-romantic antialiased;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-romantic-red/30 ring-offset-2 ring-offset-background;
   }
 }
 
 @layer components {
+  /* --- Romantic gradient utilities --- */
   .romantic-gradient {
     @apply bg-gradient-to-br from-romantic-red to-romantic-pink;
   }
-  
+
   .romantic-gradient-dark {
     @apply bg-gradient-to-br from-romantic-rose to-romantic-magenta;
   }
-  
+
+  /* --- Buttons --- */
   .romantic-btn {
-    @apply bg-romantic-red hover:bg-romantic-rose text-white font-medium py-3 px-6 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl;
+    @apply bg-gradient-to-r from-romantic-red to-romantic-rose hover:from-romantic-rose hover:to-romantic-red text-white font-semibold py-2.5 px-6 rounded-xl transition-all duration-200 shadow-md shadow-romantic-red/15 hover:shadow-lg hover:shadow-romantic-red/25 active:scale-[0.98];
   }
-  
+
   .romantic-btn-outline {
-    @apply border-2 border-romantic-red text-romantic-red hover:bg-romantic-red hover:text-white font-medium py-3 px-6 rounded-full transition-all duration-300 transform hover:scale-105;
+    @apply border-2 border-romantic-red/30 text-romantic-red hover:bg-romantic-red hover:text-white font-semibold py-2.5 px-6 rounded-xl transition-all duration-200 hover:border-romantic-red active:scale-[0.98];
   }
-  
+
+  /* --- Cards --- */
   .romantic-card {
-    @apply bg-white dark:bg-romantic-dark-card border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6;
+    @apply bg-white dark:bg-[#1a1215] border border-gray-200/70 dark:border-gray-800/70 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 p-6;
+  }
+
+  /* --- Level-based card borders (deepening red) --- */
+  .level-border-1 {
+    @apply border-gray-200 dark:border-gray-700;
+  }
+  .level-border-2 {
+    @apply border-pink-200 dark:border-pink-800;
+  }
+  .level-border-3 {
+    @apply border-rose-200 dark:border-rose-800;
+  }
+  .level-border-4 {
+    @apply border-red-200 dark:border-red-800;
+  }
+  .level-border-5 {
+    border-color: rgba(255, 90, 95, 0.4);
+  }
+  .level-border-6 {
+    border-color: rgba(255, 90, 95, 0.6);
+  }
+
+  /* --- Level-based subtle glow --- */
+  .level-glow-4 {
+    box-shadow: 0 0 20px rgba(255, 90, 95, 0.08);
+  }
+  .level-glow-5 {
+    box-shadow: 0 0 24px rgba(255, 90, 95, 0.12);
+  }
+  .level-glow-6 {
+    box-shadow: 0 0 32px rgba(255, 90, 95, 0.18), 0 0 64px rgba(233, 30, 99, 0.06);
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar but keep scroll */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Thin scrollbar */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 90, 95, 0.15) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 90, 95, 0.15);
+    border-radius: 9999px;
   }
 }

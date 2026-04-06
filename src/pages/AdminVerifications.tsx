@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { ExternalLink, ShieldCheck } from 'lucide-react';
-import AppLayout from '@/components/AppLayout';
-import Sidebar from '@/components/Sidebar';
+import AuthenticatedLayout from '@/components/AuthenticatedLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { isHeartPathAdmin } from '@/lib/admin';
 import { supabase } from '@/integrations/supabase/client';
@@ -106,10 +105,8 @@ const AdminVerifications = () => {
   }
 
   return (
-    <AppLayout>
-      <div className="flex min-h-screen bg-gray-50 dark:bg-romantic-dark-bg">
-        <Sidebar />
-        <main className="flex-1 p-6 lg:ml-64">
+    <AuthenticatedLayout>
+      <div className="p-6">
           <div className="mx-auto max-w-6xl space-y-6">
             <div>
               <h1 className="mb-2 text-3xl font-bold text-gray-900 dark:text-white">Student Verification Review</h1>
@@ -206,9 +203,8 @@ const AdminVerifications = () => {
               </div>
             )}
           </div>
-        </main>
       </div>
-    </AppLayout>
+    </AuthenticatedLayout>
   );
 };
 

@@ -1,8 +1,9 @@
-
 import React from 'react';
+import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { getStageName } from '@/lib/heartpath';
+import { getLevelPulse, getLevelGlow } from '@/lib/animations';
 
 interface RelationshipBadgeProps {
   level: number;
@@ -26,17 +27,26 @@ const RelationshipBadge: React.FC<RelationshipBadgeProps> = ({ level, className 
   };
 
   const config = getLevelConfig(level);
+  const pulseVariants = getLevelPulse(level);
+  const glow = getLevelGlow(level);
 
   return (
-    <Badge 
-      className={cn(
-        "px-3 py-1 text-xs font-medium rounded-full border-0",
-        config.color,
-        className
-      )}
+    <motion.div
+      variants={pulseVariants}
+      initial="initial"
+      animate="animate"
+      style={glow ? { filter: `drop-shadow(${glow.split(',')[0]})` } : undefined}
     >
-      Level {level}: {config.name}
-    </Badge>
+      <Badge
+        className={cn(
+          "px-3 py-1 text-xs font-medium rounded-full border-0 transition-all duration-300",
+          config.color,
+          className
+        )}
+      >
+        Level {level}: {config.name}
+      </Badge>
+    </motion.div>
   );
 };
 

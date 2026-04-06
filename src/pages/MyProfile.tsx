@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
-import AppLayout from '@/components/AppLayout';
-import Sidebar from '@/components/Sidebar';
+import AuthenticatedLayout from '@/components/AuthenticatedLayout';
 import PhotoManager from '@/components/PhotoManager';
 import LevelPreview from '@/components/LevelPreview';
 import EditableField from '@/components/EditableField';
@@ -91,10 +90,8 @@ const MyProfile = () => {
 
   if (loading) {
     return (
-      <AppLayout>
-        <div className="flex min-h-screen bg-gray-50 dark:bg-romantic-dark-bg">
-          <Sidebar />
-          <main className="flex-1 lg:ml-64 p-6">
+      <AuthenticatedLayout>
+        <div className="p-6">
             <div className="max-w-6xl mx-auto">
               <div className="animate-pulse space-y-8">
                 <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
@@ -104,17 +101,14 @@ const MyProfile = () => {
                 </div>
               </div>
             </div>
-          </main>
         </div>
-      </AppLayout>
+      </AuthenticatedLayout>
     );
   }
 
   return (
-    <AppLayout>
-      <div className="flex min-h-screen bg-gray-50 dark:bg-romantic-dark-bg">
-        <Sidebar />
-        <main className="flex-1 lg:ml-64 p-6">
+    <AuthenticatedLayout>
+      <div className="p-6">
           <div className="max-w-6xl mx-auto">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
@@ -244,9 +238,8 @@ const MyProfile = () => {
               </CardContent>
             </Card>
           </div>
-        </main>
       </div>
-    </AppLayout>
+    </AuthenticatedLayout>
   );
 };
 

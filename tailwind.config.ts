@@ -69,8 +69,8 @@ export default {
 					'light-pink': '#FFE5E7',
 					rose: '#F14E5C',
 					magenta: '#E91E63',
-					'dark-bg': '#1A1A1A',
-					'dark-card': '#2A2A2A'
+					'dark-bg': '#0e0608',
+					'dark-card': '#1a1215'
 				}
 			},
 			borderRadius: {

@@ -1,9 +1,10 @@
-
 import React from 'react';
+import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Heart, Users, MessageSquare, TrendingUp } from 'lucide-react';
+import { Heart, Users, MessageSquare } from 'lucide-react';
 import RelationshipBadge from './RelationshipBadge';
 import TrustMeter from './TrustMeter';
+import { staggerContainer, cardVariants } from '@/lib/animations';
 
 interface DashboardStatsProps {
   userStats: {
@@ -25,133 +26,182 @@ interface DashboardStatsProps {
 
 const DashboardStats: React.FC<DashboardStatsProps> = ({ userStats }) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <motion.div
+      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+      variants={staggerContainer}
+      initial="initial"
+      animate="animate"
+    >
       {/* Current Level Card */}
-      <Card className="romantic-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-            Current Level
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center">
-            <RelationshipBadge level={userStats.currentLevel} />
-          </div>
-        </CardContent>
-      </Card>
+      <motion.div variants={cardVariants}>
+        <Card className="romantic-card h-full">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+              Current Level
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center">
+              <RelationshipBadge level={userStats.currentLevel} />
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Trust Score Card */}
-      <Card className="romantic-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-            Trust Meter
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TrustMeter trustScore={userStats.trustScore} />
-        </CardContent>
-      </Card>
+      <motion.div variants={cardVariants}>
+        <Card className="romantic-card h-full">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+              Trust Meter
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TrustMeter trustScore={userStats.trustScore} />
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Hearts Stats Card */}
-      <Card className="romantic-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-            Hearts Exchange
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Heart className="w-4 h-4 text-romantic-red" />
-                <span className="text-sm text-gray-600 dark:text-gray-400">Given</span>
+      <motion.div variants={cardVariants}>
+        <Card className="romantic-card h-full">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+              Hearts Exchange
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Heart className="w-4 h-4 text-romantic-red" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Given</span>
+                </div>
+                <motion.span
+                  className="font-semibold text-romantic-red"
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.5, type: 'spring' }}
+                >
+                  {userStats.heartsGiven}
+                </motion.span>
               </div>
-              <span className="font-semibold text-romantic-red">{userStats.heartsGiven}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Heart className="w-4 h-4 text-romantic-pink fill-current" />
-                <span className="text-sm text-gray-600 dark:text-gray-400">Received</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Heart className="w-4 h-4 text-romantic-pink fill-current" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Received</span>
+                </div>
+                <motion.span
+                  className="font-semibold text-romantic-pink"
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.6, type: 'spring' }}
+                >
+                  {userStats.heartsReceived}
+                </motion.span>
               </div>
-              <span className="font-semibold text-romantic-pink">{userStats.heartsReceived}</span>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Memories Card */}
-      <Card className="romantic-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-            Memories
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-romantic-red mb-1">
-              {userStats.totalMemories}
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Captured moments
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Last Interaction Card */}
-      <Card className="romantic-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-            Last Activity
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center">
-            <MessageSquare className="w-6 h-6 text-romantic-pink mx-auto mb-2" />
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {userStats.lastInteraction 
-                ? new Date(userStats.lastInteraction).toLocaleDateString()
-                : 'No recent activity'
-              }
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Match History Card */}
-      <Card className="romantic-card md:col-span-2 lg:col-span-3">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-lg font-semibold text-gray-800 dark:text-gray-200">
-            <Users className="w-5 h-5" />
-            <span>Recent Matches ({userStats.totalMatches} total)</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {userStats.recentMatches.length > 0 ? (
-            <div className="space-y-3">
-              {userStats.recentMatches.map((match) => (
-                <div key={match.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-romantic-dark-card rounded-lg">
-                  <div>
-                    <div className="font-medium text-gray-800 dark:text-gray-200">{match.name}</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">{match.college}</div>
-                  </div>
-                  <RelationshipBadge level={match.level} />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <div className="w-12 h-12 mx-auto mb-4 bg-romantic-light-pink dark:bg-romantic-red/20 rounded-full flex items-center justify-center">
-                <span className="text-xl">💝</span>
-              </div>
-              <p className="text-gray-500 dark:text-gray-400">
-                No matches yet. Start exploring to find connections!
+      <motion.div variants={cardVariants}>
+        <Card className="romantic-card h-full">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+              Memories
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center">
+              <motion.div
+                className="text-3xl font-bold text-romantic-red mb-1"
+                initial={{ opacity: 0, scale: 0 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5, delay: 0.4, type: 'spring', stiffness: 200 }}
+              >
+                {userStats.totalMemories}
+              </motion.div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Captured moments
               </p>
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Last Interaction Card */}
+      <motion.div variants={cardVariants}>
+        <Card className="romantic-card h-full">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+              Last Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center">
+              <MessageSquare className="w-6 h-6 text-romantic-pink mx-auto mb-2" />
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {userStats.lastInteraction
+                  ? new Date(userStats.lastInteraction).toLocaleDateString()
+                  : 'No recent activity'
+                }
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Match History Card */}
+      <motion.div variants={cardVariants} className="md:col-span-2 lg:col-span-3">
+        <Card className="romantic-card">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2 text-lg font-semibold text-gray-800 dark:text-gray-200">
+              <Users className="w-5 h-5" />
+              <span>Recent Matches ({userStats.totalMatches} total)</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {userStats.recentMatches.length > 0 ? (
+              <motion.div
+                className="space-y-3"
+                variants={staggerContainer}
+                initial="initial"
+                animate="animate"
+              >
+                {userStats.recentMatches.map((match) => (
+                  <motion.div
+                    key={match.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-romantic-dark-card rounded-lg transition-colors hover:bg-romantic-light-pink/50 dark:hover:bg-romantic-red/10"
+                    variants={cardVariants}
+                  >
+                    <div>
+                      <div className="font-medium text-gray-800 dark:text-gray-200">{match.name}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">{match.college}</div>
+                    </div>
+                    <RelationshipBadge level={match.level} />
+                  </motion.div>
+                ))}
+              </motion.div>
+            ) : (
+              <div className="text-center py-8">
+                <motion.div
+                  className="w-12 h-12 mx-auto mb-4 bg-romantic-light-pink dark:bg-romantic-red/20 rounded-full flex items-center justify-center"
+                  animate={{ scale: [1, 1.08, 1] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                >
+                  <span className="text-xl">💝</span>
+                </motion.div>
+                <p className="text-gray-500 dark:text-gray-400">
+                  No matches yet. Start exploring to find connections!
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+    </motion.div>
   );
 };
 
