@@ -34,8 +34,10 @@ const BlockedUserList: React.FC = () => {
 
       if (error) throw error;
 
-      const blockedUserIds = data?.map((item) => item.blocked_id) || [];
-      const { data: userData } = await supabase.from('users').select('id, name, college_name').in('id', blockedUserIds);
+      // The users SELECT policy is locked down to self/partner only, so we
+      // cannot read blocked users' rows directly. Use the SECURITY DEFINER RPC
+      // which is filtered server-side to the caller's own block list.
+      const { data: userData } = await supabase.rpc('blocked_user_summaries');
 
       const formattedUsers =
         data?.map((item) => {

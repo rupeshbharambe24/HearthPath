@@ -60,6 +60,10 @@ export const SHARED_PERMISSION_NAMES: HeartPathPermissionName[] = [
   'ai_shared_recap_access',
 ];
 
+// Mirrored from `public.permission_stage_requirements` in the database.
+// The DB is canonical: a BEFORE INSERT trigger on `relationship_permissions`
+// enforces these required stages server-side. Keep this map in sync with the
+// seed in `supabase/migrations/20260425120000_relationship_permission_integrity.sql`.
 export const PERMISSION_STAGE_REQUIREMENTS: Record<HeartPathPermissionName, HeartPathStage> = {
   full_face_photo: 5,
   private_photo_gallery: 4,
@@ -161,11 +165,19 @@ export function buildVisibleProfile(
     about: canSeeDeepDetails
       ? profile.about || 'No profile story shared yet.'
       : 'HeartPath reveals deeper details only after mutual trust grows.',
-    levelOnePhoto: photoLevels.level_1 || undefined,
-    privateGallery: canSeeGallery
-      ? [photoLevels.level_2, photoLevels.level_3, canSeeFullFace ? photoLevels.level_4 : undefined].filter(Boolean) as string[]
-      : [],
-    fullFacePhoto: canSeeFullFace ? photoLevels.level_4 || undefined : undefined,
+    // Photo paths are intentionally not exposed here. The profile-photos
+    // bucket is private and the storage object key is per-user, so shipping
+    // the raw path leaks the per-user object key for every Explore card.
+    // Consumers that need to render a photo must call useSignedPhoto(targetId, level)
+    // (or, for the user's own photos, read users.photo_levels directly).
+    hasLevelOnePhoto: Boolean(photoLevels.level_1),
+    hasLevelTwoPhoto: canSeeGallery && Boolean(photoLevels.level_2),
+    hasLevelThreePhoto: canSeeGallery && Boolean(photoLevels.level_3),
+    hasLevelFourPhoto: canSeeGallery && canSeeFullFace && Boolean(photoLevels.level_4),
+    galleryPhotoCount:
+      (canSeeGallery && photoLevels.level_2 ? 1 : 0) +
+      (canSeeGallery && photoLevels.level_3 ? 1 : 0) +
+      (canSeeGallery && canSeeFullFace && photoLevels.level_4 ? 1 : 0),
   };
 }
 

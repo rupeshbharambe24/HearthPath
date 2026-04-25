@@ -45,29 +45,32 @@ const PhotoManager = () => {
       const existingPhotoLevels = normalizePhotoLevels(userRow?.photo_levels);
       const updatedSlots = await Promise.all(
         photoSlots.map(async (slot) => {
-          const { data } = await supabase.storage
+          const { data: listed } = await supabase.storage
             .from('profile-photos')
             .list(`${user.id}/`, { search: `level_${slot.level}` });
 
-          if (data && data.length > 0) {
-            const { data: urlData } = supabase.storage
-              .from('profile-photos')
-              .getPublicUrl(`${user.id}/${data[0].name}`);
+          // Profile-photos bucket is private after the 20260425110000 migration.
+          // Self-reads are allowed by the profile_photos_self_read storage policy,
+          // so we sign the user's own object path directly via the storage SDK
+          // (no edge-function round-trip needed for the owner).
+          const objectPath =
+            listed && listed.length > 0
+              ? `${user.id}/${listed[0].name}`
+              : existingPhotoLevels[`level_${slot.level}`];
 
-            return {
-              ...slot,
-              image: urlData.publicUrl || existingPhotoLevels[`level_${slot.level}`],
-              uploaded: true
-            };
+          if (!objectPath) {
+            return slot;
           }
-          if (existingPhotoLevels[`level_${slot.level}`]) {
-            return {
-              ...slot,
-              image: existingPhotoLevels[`level_${slot.level}`],
-              uploaded: true,
-            };
-          }
-          return slot;
+
+          const { data: signed } = await supabase.storage
+            .from('profile-photos')
+            .createSignedUrl(objectPath, 60);
+
+          return {
+            ...slot,
+            image: signed?.signedUrl || undefined,
+            uploaded: true,
+          };
         })
       );
       setPhotoSlots(updatedSlots);
@@ -116,7 +119,7 @@ const PhotoManager = () => {
         const fileName = `level_${level}.${fileExt}`;
         const filePath = `${user.id}/${fileName}`;
 
-        // Upload to Supabase Storage
+        // Upload to Supabase Storage (bucket is private after 20260425110000).
         const { error: uploadError } = await supabase.storage
           .from('profile-photos')
           .upload(filePath, file, { upsert: true });
@@ -125,31 +128,36 @@ const PhotoManager = () => {
           throw uploadError;
         }
 
-        // Get public URL
-        const { data: urlData } = supabase.storage
+        // Bucket is private. We store the storage object path in photo_levels
+        // (the new convention; no public URL is durable). For local UI we ask
+        // for a short-lived signed URL — the self-read storage policy permits it.
+        const { data: signed } = await supabase.storage
           .from('profile-photos')
-          .getPublicUrl(filePath);
+          .createSignedUrl(filePath, 60);
 
-        // Update photo slots
+        // Read existing photo_levels first so that we keep paths for other slots.
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('photo_levels')
+          .eq('id', user.id)
+          .single();
+        const existingPhotoLevels = normalizePhotoLevels(userRow?.photo_levels);
+
         const nextSlots = photoSlots.map((slot) =>
           slot.level === level
-            ? { ...slot, image: urlData.publicUrl, uploaded: true }
+            ? { ...slot, image: signed?.signedUrl || undefined, uploaded: true }
             : slot
         );
         setPhotoSlots(nextSlots);
 
-        // Update user's photo_levels in database
+        // Persist the *path* (not the signed URL — that expires) in photo_levels.
         const { error: dbError } = await supabase
           .from('users')
           .update({
             photo_levels: {
-              ...nextSlots.reduce<Record<string, string>>((acc, slot) => {
-                if (slot.image) {
-                  acc[`level_${slot.level}`] = slot.image;
-                }
-                return acc;
-              }, {}),
-            }
+              ...existingPhotoLevels,
+              [`level_${level}`]: filePath,
+            },
           })
           .eq('id', user.id);
 

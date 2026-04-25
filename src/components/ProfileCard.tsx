@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MessageSquare, Heart, ShieldCheck, Sparkles, X } from 'lucide-react';
 import RelationshipBadge from './RelationshipBadge';
+import { useSignedPhoto } from '@/hooks/useSignedPhoto';
 
 interface ProfileCardProps {
   profile: {
@@ -16,7 +17,17 @@ interface ProfileCardProps {
     hobbies: string[];
     description: string;
     relationshipLevel: number;
-    photoUrl?: string;
+    /**
+     * Optional photo level to display for this profile. Defaults to 1 (the
+     * public-discovery level_1 photo). Higher levels are gated by stage and
+     * permission inside viewer_can_see_photo_level.
+     */
+    photoLevel?: 1 | 2 | 3 | 4;
+    /**
+     * If true, no signed-URL request is made for this card. Useful when the
+     * underlying user has not uploaded a photo at the requested level.
+     */
+    hasPhoto?: boolean;
     galleryCount?: number;
     compatibilityScore: number;
     scoreBand: string;
@@ -37,6 +48,13 @@ const scoreBandStyles: Record<string, string> = {
 
 const ProfileCard: React.FC<ProfileCardProps> = ({ profile, onSendChatRequest, onDismiss }) => {
   const sharedTraits = profile.sharedValues.length > 0 ? profile.sharedValues : profile.hobbies;
+  const photoLevel = profile.photoLevel ?? 1;
+  // Cross-user photo reads now go through the signed-photo-url edge function.
+  // The bucket is private; viewer_can_see_photo_level enforces stage + permission.
+  const { data: signedPhotoUrl } = useSignedPhoto(
+    profile.hasPhoto ? profile.id : null,
+    photoLevel
+  );
 
   return (
     <motion.div
@@ -44,9 +62,9 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ profile, onSendChatRequest, o
     >
       <Card className="romantic-card overflow-hidden group">
         <div className="aspect-[4/3] bg-gradient-to-br from-romantic-light-pink via-white to-rose-100 dark:from-romantic-red/20 dark:via-romantic-dark-card dark:to-romantic-pink/20 overflow-hidden">
-          {profile.photoUrl ? (
+          {signedPhotoUrl ? (
             <motion.img
-              src={profile.photoUrl}
+              src={signedPhotoUrl}
               alt={profile.name}
               className="h-full w-full object-cover"
               whileHover={{ scale: 1.05 }}

@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
 import { getStageName } from '@/lib/heartpath';
+import { memorySchema } from '@/lib/schemas';
 
 type MemoryEntry = Tables<'memories'>;
 
@@ -116,9 +117,25 @@ const MemoryTrail: React.FC<MemoryTrailProps> = ({
 
     fetchMemories(true);
 
+    // Only subscribe with a row filter when we already know the relationship id.
+    // If we only have a partnerId, the relationship lookup happens inside fetchMemories;
+    // skip the realtime subscription rather than receive every memories row across the table.
+    if (!relationshipId) {
+      return;
+    }
+
     const channel = supabase
-      .channel(`memories-${partnerId || relationshipId || 'shared'}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'memories' }, () => void fetchMemories(false))
+      .channel(`memories-${relationshipId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'memories',
+          filter: `relationship_id=eq.${relationshipId}`,
+        },
+        () => void fetchMemories(false)
+      )
       .subscribe();
 
     return () => {
@@ -159,6 +176,20 @@ const MemoryTrail: React.FC<MemoryTrailProps> = ({
           .filter(Boolean),
         reflection_follow_up: reflectionFollowUp.trim() || undefined,
       };
+
+      const parsed = memorySchema.safeParse({
+        memo_text: payload.memo_text,
+        entry_type: payload.entry_type,
+        visibility: payload.visibility,
+      });
+      if (!parsed.success) {
+        toast({
+          title: 'Cannot save memory',
+          description: parsed.error.issues[0]?.message || 'Invalid memory.',
+          variant: 'destructive',
+        });
+        return;
+      }
 
       const result = onCreateMemory
         ? await onCreateMemory(payload)
