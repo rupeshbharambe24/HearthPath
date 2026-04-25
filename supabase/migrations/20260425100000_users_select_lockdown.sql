@@ -90,3 +90,32 @@ $$;
 
 REVOKE ALL ON FUNCTION public.discovery_candidates(int) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.discovery_candidates(int) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.blocked_user_summaries()
+RETURNS TABLE (
+  id uuid,
+  name text,
+  college_name text
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  viewer_id uuid := auth.uid();
+BEGIN
+  IF viewer_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  RETURN QUERY
+  SELECT u.id, u.name, u.college_name
+  FROM public.users u
+  WHERE u.id IN (
+    SELECT b.blocked_id FROM public.blocked_users b WHERE b.blocker_id = viewer_id
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.blocked_user_summaries() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.blocked_user_summaries() TO authenticated;

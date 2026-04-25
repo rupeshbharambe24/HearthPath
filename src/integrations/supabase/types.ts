@@ -878,6 +878,14 @@ export type Database = {
           normalized_email: string | null
         }[]
       }
+      blocked_user_summaries: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          name: string
+          college_name: string | null
+        }[]
+      }
       discovery_candidates: {
         Args: {
           p_limit?: number
