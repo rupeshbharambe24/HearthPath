@@ -57,6 +57,10 @@ BEGIN
   DELETE FROM public.user_verifications WHERE user_id = p_user;
   DELETE FROM public.blocked_users WHERE blocker_id = p_user OR blocked_id = p_user;
 
+  -- fun_posts: owner_id cascades from auth.users, but target_user has no ON
+  -- DELETE clause and would otherwise leave orphan refs. Cover both sides.
+  DELETE FROM public.fun_posts WHERE owner_id = p_user OR target_user = p_user;
+
   -- Public profile row (auth.users CASCADE will also fire when the auth row
   -- goes away, but be explicit so the purge is idempotent and self-contained).
   DELETE FROM public.users WHERE id = p_user;
