@@ -47,10 +47,27 @@ Deno.serve(async (request) => {
     .select('photo_levels')
     .eq('id', body.targetUserId)
     .single();
-  if (targetErr || !targetRow) return json(404, { error: 'Target not found' });
+  if (targetErr || !targetRow) {
+    // Distinct telemetry preserved server-side; response is intentionally
+    // identical to the "photo not set" branch below to avoid leaking a
+    // user-existence enumeration oracle (target row missing vs. row
+    // present without this photo level).
+    console.error('signed-photo-url: target user row not found', {
+      targetUserId: body.targetUserId,
+      level: body.level,
+      err: targetErr?.message,
+    });
+    return json(404, { error: 'Photo not available' });
+  }
 
   const path = (targetRow.photo_levels as Record<string, unknown>)?.[`level_${body.level}`];
-  if (typeof path !== 'string' || path.length === 0) return json(404, { error: 'Photo not set' });
+  if (typeof path !== 'string' || path.length === 0) {
+    console.error('signed-photo-url: photo level not set on target', {
+      targetUserId: body.targetUserId,
+      level: body.level,
+    });
+    return json(404, { error: 'Photo not available' });
+  }
 
   const { data: signed, error: signErr } = await admin.storage
     .from('profile-photos')
