@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { withTimeout } from '@/lib/async';
@@ -234,21 +234,73 @@ export const useRelationshipSpaceData = () => {
     }
 
     fetchData(true);
+  }, [user?.id]);
 
-    const channel = supabase
-      .channel(`heartpath-space-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'relationships' }, () => void fetchData(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'relationship_permissions' }, () => void fetchData(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'weekly_checkins' }, () => void fetchData(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_summaries' }, () => void fetchData(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'memories' }, () => void fetchData(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, () => void fetchData(false))
-      .subscribe();
+  // Stable, sorted list of relationship ids the current user participates in.
+  // Used to scope realtime subscriptions on per-relationship tables. Sorting
+  // keeps the dependency string stable across re-renders even if the underlying
+  // array order changes.
+  const relationshipIdsKey = useMemo(
+    () =>
+      relationships
+        .map((relationship) => relationship.id)
+        .filter(Boolean)
+        .sort()
+        .join(','),
+    [relationships]
+  );
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    const relationshipIds = relationshipIdsKey ? relationshipIdsKey.split(',') : [];
+
+    const channel = supabase.channel(`heartpath-space-${user.id}`);
+
+    // Always subscribe to relationships rows the user owns. This catches
+    // brand-new pending requests inbound to this user (which won't be in
+    // relationshipIds yet) as well as updates to existing relationships.
+    channel
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'relationships', filter: `user_a=eq.${user.id}` },
+        () => void fetchData(false)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'relationships', filter: `user_b=eq.${user.id}` },
+        () => void fetchData(false)
+      );
+
+    // Per-relationship tables are scoped by the in-list filter. Skip subscribing
+    // when the user has no relationships -- there is nothing to update.
+    if (relationshipIds.length > 0) {
+      const inFilter = `relationship_id=in.(${relationshipIds.join(',')})`;
+      const perRelationshipTables = [
+        'relationship_permissions',
+        'weekly_checkins',
+        'ai_summaries',
+        'memories',
+        'reports',
+      ] as const;
+
+      for (const table of perRelationshipTables) {
+        channel.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table, filter: inFilter },
+          () => void fetchData(false)
+        );
+      }
+    }
+
+    channel.subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id]);
+  }, [user?.id, relationshipIdsKey]);
 
   const partner = primaryRelationship?.partner ?? null;
   const currentStage = primaryRelationship?.current_stage ?? primaryRelationship?.current_level ?? 1;

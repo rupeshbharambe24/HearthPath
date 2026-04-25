@@ -116,9 +116,25 @@ const MemoryTrail: React.FC<MemoryTrailProps> = ({
 
     fetchMemories(true);
 
+    // Only subscribe with a row filter when we already know the relationship id.
+    // If we only have a partnerId, the relationship lookup happens inside fetchMemories;
+    // skip the realtime subscription rather than receive every memories row across the table.
+    if (!relationshipId) {
+      return;
+    }
+
     const channel = supabase
-      .channel(`memories-${partnerId || relationshipId || 'shared'}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'memories' }, () => void fetchMemories(false))
+      .channel(`memories-${relationshipId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'memories',
+          filter: `relationship_id=eq.${relationshipId}`,
+        },
+        () => void fetchMemories(false)
+      )
       .subscribe();
 
     return () => {
