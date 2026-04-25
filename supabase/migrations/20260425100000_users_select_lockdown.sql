@@ -3,20 +3,23 @@
 DROP POLICY IF EXISTS "Users can view all user profiles" ON public.users;
 
 -- Self-read: full row.
+DROP POLICY IF EXISTS "users_self_select" ON public.users;
 CREATE POLICY "users_self_select"
 ON public.users
 FOR SELECT
 USING (auth.uid() = id);
 
 -- Partner-read: only when an active/pending/exclusive/paused/cooldown relationship exists.
+DROP POLICY IF EXISTS "users_partner_select" ON public.users;
 CREATE POLICY "users_partner_select"
 ON public.users
 FOR SELECT
 USING (
   EXISTS (
     SELECT 1 FROM public.relationships r
-    WHERE (r.user_a = auth.uid() AND r.user_b = users.id)
-       OR (r.user_b = auth.uid() AND r.user_a = users.id)
+    WHERE ((r.user_a = auth.uid() AND r.user_b = users.id)
+        OR (r.user_b = auth.uid() AND r.user_a = users.id))
+      AND r.lifecycle_state IN ('pending','active','exclusive','paused','cooldown')
   )
 );
 
@@ -50,7 +53,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
 DECLARE
   viewer_id uuid := auth.uid();
@@ -99,7 +102,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
 DECLARE
   viewer_id uuid := auth.uid();
