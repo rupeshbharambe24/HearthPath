@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getLevelGlow } from '@/lib/animations';
+import { messageSchema } from '@/lib/schemas';
 
 interface ChatRoomProps {
   partnerId: string;
@@ -55,13 +56,24 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
   const handleSendMessage = async () => {
     if (!message.trim() || !user?.id || sending) return;
 
+    const trimmed = message.trim();
+    const parsed = messageSchema.safeParse({ content: trimmed });
+    if (!parsed.success) {
+      toast({
+        title: 'Cannot send message',
+        description: parsed.error.issues[0]?.message || 'Invalid message.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setSending(true);
 
       const { error } = await supabase
         .from('messages')
         .insert([{
-          content: message.trim(),
+          content: trimmed,
           sender_id: user.id,
           receiver_id: partnerId,
           content_type: 'text'

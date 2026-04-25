@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { withTimeout } from '@/lib/async';
+import { memorySchema, reportSchema, weeklyCheckinSchema } from '@/lib/schemas';
 import { buildMemorySearchResult, buildMilestoneSummary, buildMonthlyRecap } from '@/lib/relationship-ai';
 import {
   canGrantPermissionAtStage,
@@ -581,6 +582,18 @@ export const useRelationshipSpaceData = () => {
       return { success: false as const, error: 'No relationship available for a check-in.' };
     }
 
+    const parsed = weeklyCheckinSchema.safeParse({
+      relationship_rating: input.relationship_rating,
+      relationship_note: input.relationship_note,
+      gratitude_note: input.gratitude_note,
+    });
+    if (!parsed.success) {
+      return {
+        success: false as const,
+        error: parsed.error.issues[0]?.message || 'Invalid weekly check-in.',
+      };
+    }
+
     try {
       const { error } = await supabase.from('weekly_checkins').upsert(
         {
@@ -622,6 +635,18 @@ export const useRelationshipSpaceData = () => {
 
     if (input.visibility === 'shared' && !sharedMemoryVaultEnabled) {
       return { success: false as const, error: 'Both partners must enable the shared memory vault first.' };
+    }
+
+    const parsed = memorySchema.safeParse({
+      memo_text: input.memo_text,
+      entry_type: input.entry_type,
+      visibility: input.visibility,
+    });
+    if (!parsed.success) {
+      return {
+        success: false as const,
+        error: parsed.error.issues[0]?.message || 'Invalid memory.',
+      };
     }
 
     try {
@@ -823,6 +848,17 @@ export const useRelationshipSpaceData = () => {
   }) => {
     if (!user?.id || !partner?.id) {
       return { success: false as const, error: 'No partner available to report.' };
+    }
+
+    const parsed = reportSchema.safeParse({
+      reason: input.reason,
+      details: input.details?.trim() || undefined,
+    });
+    if (!parsed.success) {
+      return {
+        success: false as const,
+        error: parsed.error.issues[0]?.message || 'Invalid report.',
+      };
     }
 
     try {

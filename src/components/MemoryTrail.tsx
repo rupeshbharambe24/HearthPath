@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
 import { getStageName } from '@/lib/heartpath';
+import { memorySchema } from '@/lib/schemas';
 
 type MemoryEntry = Tables<'memories'>;
 
@@ -175,6 +176,20 @@ const MemoryTrail: React.FC<MemoryTrailProps> = ({
           .filter(Boolean),
         reflection_follow_up: reflectionFollowUp.trim() || undefined,
       };
+
+      const parsed = memorySchema.safeParse({
+        memo_text: payload.memo_text,
+        entry_type: payload.entry_type,
+        visibility: payload.visibility,
+      });
+      if (!parsed.success) {
+        toast({
+          title: 'Cannot save memory',
+          description: parsed.error.issues[0]?.message || 'Invalid memory.',
+          variant: 'destructive',
+        });
+        return;
+      }
 
       const result = onCreateMemory
         ? await onCreateMemory(payload)

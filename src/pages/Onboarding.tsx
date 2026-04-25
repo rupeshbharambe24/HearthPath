@@ -26,6 +26,7 @@ import {
   type OnboardingStep,
 } from '@/lib/access-state';
 import { getAllowedOnboardingSteps, getNextOnboardingStep } from '@/lib/onboarding';
+import { aboutSchema, nameSchema } from '@/lib/schemas';
 import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
 
 type UserRow = Tables<'users'>;
@@ -390,6 +391,11 @@ const Onboarding = () => {
         throw new Error('Complete all required basics before continuing.');
       }
 
+      const nameResult = nameSchema.safeParse(formData.name.trim());
+      if (!nameResult.success) {
+        throw new Error(nameResult.error.issues[0]?.message || 'Invalid name.');
+      }
+
       updates.name = formData.name.trim();
       updates.college_name = formData.college_name.trim();
       updates.branch = formData.branch.trim();
@@ -411,6 +417,11 @@ const Onboarding = () => {
         !formData.heartpath_norms_acknowledged
       ) {
         throw new Error('Complete your HeartPath preferences before continuing.');
+      }
+
+      const aboutResult = aboutSchema.safeParse(formData.about.trim());
+      if (!aboutResult.success) {
+        throw new Error(aboutResult.error.issues[0]?.message || 'Invalid bio.');
       }
 
       updates.about = formData.about.trim();
