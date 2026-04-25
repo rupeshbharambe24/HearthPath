@@ -60,6 +60,10 @@ export const SHARED_PERMISSION_NAMES: HeartPathPermissionName[] = [
   'ai_shared_recap_access',
 ];
 
+// Mirrored from `public.permission_stage_requirements` in the database.
+// The DB is canonical: a BEFORE INSERT trigger on `relationship_permissions`
+// enforces these required stages server-side. Keep this map in sync with the
+// seed in `supabase/migrations/20260425120000_relationship_permission_integrity.sql`.
 export const PERMISSION_STAGE_REQUIREMENTS: Record<HeartPathPermissionName, HeartPathStage> = {
   full_face_photo: 5,
   private_photo_gallery: 4,
