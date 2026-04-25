@@ -878,6 +878,35 @@ export type Database = {
           normalized_email: string | null
         }[]
       }
+      discovery_candidates: {
+        Args: {
+          p_limit?: number
+        }
+        Returns: {
+          id: string
+          name: string
+          college_name: string | null
+          branch: string | null
+          year: number | null
+          hobbies: string[] | null
+          about: string | null
+          relationship_intent: string | null
+          preferred_chat_frequency: string | null
+          pace_style: string | null
+          communication_style: string | null
+          value_tags: string[] | null
+          lifestyle_preferences: string[] | null
+          deal_breakers: string[] | null
+          discovery_mode: string | null
+          campus_zone: string | null
+          profile_completeness: number | null
+          verification_badges: Json | null
+          photo_levels: Json | null
+          access_state: string | null
+          boundary_topics: string[] | null
+          heartpath_norms_acknowledged_at: string | null
+        }[]
+      }
       sync_user_access_state: {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Tables"]["users"]["Row"]

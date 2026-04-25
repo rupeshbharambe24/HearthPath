@@ -19,10 +19,6 @@ type BlockedRow = Tables<'blocked_users'>;
 const DISCOVERY_BLOCKING_STATES = ['pending', 'active', 'exclusive', 'paused', 'cooldown'] as const;
 const DAILY_INVITATION_LIMIT = 3;
 
-function formatInList(values: string[]) {
-  return `(${values.map((value) => `"${value}"`).join(',')})`;
-}
-
 type ExploreSuggestion = ExploreProfile & {
   compatibility: CompatibilityResult;
   seriousnessSignals: string[];
@@ -100,16 +96,14 @@ async function fetchExploreData(userId: string) {
     }
   });
 
-  let query = supabase.from('users').select('*').limit(40);
-  const excludedList = Array.from(excludedUserIds);
-  if (excludedList.length > 0) {
-    query = query.not('id', 'in', formatInList(excludedList));
-  }
-
-  const profileResponse = await runSupabaseQuery(query, 'Loading discovery profiles');
+  const profileResponse = await runSupabaseQuery(
+    supabase.rpc('discovery_candidates', { p_limit: 40 }),
+    'Loading discovery profiles'
+  );
   const discoveryMode = (currentUser.discovery_mode || 'slow_burn') as DiscoveryMode;
 
-  const profiles = ((profileResponse.data || []) as ExploreProfile[])
+  const profiles = ((profileResponse.data || []) as unknown as ExploreProfile[])
+    .filter((candidate) => !excludedUserIds.has(candidate.id))
     .filter((candidate) => candidate.access_state === 'active')
     .filter((candidate) => modeAllowsCandidate(currentUser, candidate, discoveryMode));
 
