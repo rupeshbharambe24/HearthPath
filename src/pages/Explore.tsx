@@ -195,6 +195,11 @@ const Explore = () => {
               <AnimatePresence mode="popLayout">
                 {profiles.map((profile) => {
                   const visibleProfile = buildVisibleProfile(profile, 1, []);
+                  // buildVisibleProfile no longer ships photo paths — only a
+                  // has<Level>Photo signal. The signed-URL hook fetches the
+                  // actual asset; cross-user authorization is enforced
+                  // server-side in viewer_can_see_photo_level.
+                  const hasLevelOnePhoto = visibleProfile.hasLevelOnePhoto;
 
                   return (
                     <motion.div
@@ -213,8 +218,9 @@ const Explore = () => {
                           hobbies: visibleProfile.hobbies,
                           description: visibleProfile.about,
                           relationshipLevel: 1,
-                          photoUrl: visibleProfile.levelOnePhoto || visibleProfile.fullFacePhoto,
-                          galleryCount: visibleProfile.privateGallery.length,
+                          photoLevel: 1,
+                          hasPhoto: hasLevelOnePhoto,
+                          galleryCount: visibleProfile.galleryPhotoCount,
                           compatibilityScore: profile.compatibility.score,
                           scoreBand: profile.compatibility.scoreBand,
                           reasons: profile.compatibility.reasons,

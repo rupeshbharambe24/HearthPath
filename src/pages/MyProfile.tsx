@@ -12,6 +12,7 @@ import { useUserData } from '@/hooks/useUserData';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { aboutSchema, nameSchema } from '@/lib/schemas';
 
 const MyProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -47,9 +48,29 @@ const MyProfile = () => {
   const handleSave = async () => {
     if (!user?.id) return;
 
+    const nameResult = nameSchema.safeParse(userInfo.name.trim());
+    if (!nameResult.success) {
+      toast({
+        title: 'Cannot save profile',
+        description: nameResult.error.issues[0]?.message || 'Invalid name.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const aboutResult = aboutSchema.safeParse(userInfo.about);
+    if (!aboutResult.success) {
+      toast({
+        title: 'Cannot save profile',
+        description: aboutResult.error.issues[0]?.message || 'Invalid bio.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setSaving(true);
-      
+
       const updateData = {
         name: userInfo.name,
         college_name: userInfo.college_name,

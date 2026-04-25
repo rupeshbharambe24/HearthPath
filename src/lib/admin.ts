@@ -1,12 +1,10 @@
-export function getHeartPathAdminEmails() {
-  const raw = import.meta.env.VITE_HEARTPATH_ADMIN_EMAILS || '';
-  return raw
-    .split(',')
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-}
+import { supabase } from '@/integrations/supabase/client';
 
-export function isHeartPathAdmin(email?: string | null) {
-  if (!email) return false;
-  return getHeartPathAdminEmails().includes(email.trim().toLowerCase());
+export async function fetchIsAdmin(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('is_admin');
+  if (error) {
+    console.warn('is_admin check failed:', error.message);
+    return false;
+  }
+  return Boolean(data);
 }

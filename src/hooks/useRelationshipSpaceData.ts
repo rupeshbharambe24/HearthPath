@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { withTimeout } from '@/lib/async';
+import { memorySchema, reportSchema, weeklyCheckinSchema } from '@/lib/schemas';
 import { buildMemorySearchResult, buildMilestoneSummary, buildMonthlyRecap } from '@/lib/relationship-ai';
 import {
   canGrantPermissionAtStage,
@@ -234,21 +235,73 @@ export const useRelationshipSpaceData = () => {
     }
 
     fetchData(true);
+  }, [user?.id]);
 
-    const channel = supabase
-      .channel(`heartpath-space-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'relationships' }, () => void fetchData(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'relationship_permissions' }, () => void fetchData(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'weekly_checkins' }, () => void fetchData(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_summaries' }, () => void fetchData(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'memories' }, () => void fetchData(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, () => void fetchData(false))
-      .subscribe();
+  // Stable, sorted list of relationship ids the current user participates in.
+  // Used to scope realtime subscriptions on per-relationship tables. Sorting
+  // keeps the dependency string stable across re-renders even if the underlying
+  // array order changes.
+  const relationshipIdsKey = useMemo(
+    () =>
+      relationships
+        .map((relationship) => relationship.id)
+        .filter(Boolean)
+        .sort()
+        .join(','),
+    [relationships]
+  );
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    const relationshipIds = relationshipIdsKey ? relationshipIdsKey.split(',') : [];
+
+    const channel = supabase.channel(`heartpath-space-${user.id}`);
+
+    // Always subscribe to relationships rows the user owns. This catches
+    // brand-new pending requests inbound to this user (which won't be in
+    // relationshipIds yet) as well as updates to existing relationships.
+    channel
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'relationships', filter: `user_a=eq.${user.id}` },
+        () => void fetchData(false)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'relationships', filter: `user_b=eq.${user.id}` },
+        () => void fetchData(false)
+      );
+
+    // Per-relationship tables are scoped by the in-list filter. Skip subscribing
+    // when the user has no relationships -- there is nothing to update.
+    if (relationshipIds.length > 0) {
+      const inFilter = `relationship_id=in.(${relationshipIds.join(',')})`;
+      const perRelationshipTables = [
+        'relationship_permissions',
+        'weekly_checkins',
+        'ai_summaries',
+        'memories',
+        'reports',
+      ] as const;
+
+      for (const table of perRelationshipTables) {
+        channel.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table, filter: inFilter },
+          () => void fetchData(false)
+        );
+      }
+    }
+
+    channel.subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id]);
+  }, [user?.id, relationshipIdsKey]);
 
   const partner = primaryRelationship?.partner ?? null;
   const currentStage = primaryRelationship?.current_stage ?? primaryRelationship?.current_level ?? 1;
@@ -441,7 +494,7 @@ export const useRelationshipSpaceData = () => {
           accepted_stage: acceptedStage,
         });
       } else {
-        const cooldownUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+        const cooldownUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
         const { error } = await supabase
           .from('relationships')
           .update({
@@ -529,6 +582,18 @@ export const useRelationshipSpaceData = () => {
       return { success: false as const, error: 'No relationship available for a check-in.' };
     }
 
+    const parsed = weeklyCheckinSchema.safeParse({
+      relationship_rating: input.relationship_rating,
+      relationship_note: input.relationship_note,
+      gratitude_note: input.gratitude_note,
+    });
+    if (!parsed.success) {
+      return {
+        success: false as const,
+        error: parsed.error.issues[0]?.message || 'Invalid weekly check-in.',
+      };
+    }
+
     try {
       const { error } = await supabase.from('weekly_checkins').upsert(
         {
@@ -570,6 +635,18 @@ export const useRelationshipSpaceData = () => {
 
     if (input.visibility === 'shared' && !sharedMemoryVaultEnabled) {
       return { success: false as const, error: 'Both partners must enable the shared memory vault first.' };
+    }
+
+    const parsed = memorySchema.safeParse({
+      memo_text: input.memo_text,
+      entry_type: input.entry_type,
+      visibility: input.visibility,
+    });
+    if (!parsed.success) {
+      return {
+        success: false as const,
+        error: parsed.error.issues[0]?.message || 'Invalid memory.',
+      };
     }
 
     try {
@@ -771,6 +848,17 @@ export const useRelationshipSpaceData = () => {
   }) => {
     if (!user?.id || !partner?.id) {
       return { success: false as const, error: 'No partner available to report.' };
+    }
+
+    const parsed = reportSchema.safeParse({
+      reason: input.reason,
+      details: input.details?.trim() || undefined,
+    });
+    if (!parsed.success) {
+      return {
+        success: false as const,
+        error: parsed.error.issues[0]?.message || 'Invalid report.',
+      };
     }
 
     try {

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Tables } from '@/integrations/supabase/types';
+import type { Database, Tables } from '@/integrations/supabase/types';
 import { runSupabaseQuery } from '@/lib/supabase-query';
 import { withTimeout } from '@/lib/async';
 import {
@@ -12,23 +12,20 @@ import {
   type DiscoveryMode,
 } from '@/lib/compatibility';
 
-type ExploreProfile = Tables<'users'>;
+type ViewerProfile = Tables<'users'>;
+type DiscoveryCandidate = Database['public']['Functions']['discovery_candidates']['Returns'][number];
 type RelationshipRow = Tables<'relationships'>;
 type BlockedRow = Tables<'blocked_users'>;
 
 const DISCOVERY_BLOCKING_STATES = ['pending', 'active', 'exclusive', 'paused', 'cooldown'] as const;
 const DAILY_INVITATION_LIMIT = 3;
 
-function formatInList(values: string[]) {
-  return `(${values.map((value) => `"${value}"`).join(',')})`;
-}
-
-type ExploreSuggestion = ExploreProfile & {
+type ExploreSuggestion = DiscoveryCandidate & {
   compatibility: CompatibilityResult;
   seriousnessSignals: string[];
 };
 
-function modeAllowsCandidate(viewer: ExploreProfile, candidate: ExploreProfile, mode: DiscoveryMode) {
+function modeAllowsCandidate(viewer: ViewerProfile, candidate: DiscoveryCandidate, mode: DiscoveryMode) {
   switch (mode) {
     case 'friendship_first':
       return candidate.relationship_intent === 'Friendship first';
@@ -67,7 +64,7 @@ async function fetchExploreData(userId: string) {
   if (blockedResponse.error) throw new Error(blockedResponse.error.message || 'Loading blocked users failed');
   if (actionResponse.error) throw new Error(actionResponse.error.message || 'Loading discovery history failed');
 
-  const currentUser = userResponse.data as ExploreProfile;
+  const currentUser = userResponse.data as ViewerProfile;
   const relationshipRows = (relationshipResponse.data || []) as RelationshipRow[];
   const blockedRows = (blockedResponse.data || []) as BlockedRow[];
   const actionRows = actionResponse.data || [];
@@ -100,16 +97,14 @@ async function fetchExploreData(userId: string) {
     }
   });
 
-  let query = supabase.from('users').select('*').limit(40);
-  const excludedList = Array.from(excludedUserIds);
-  if (excludedList.length > 0) {
-    query = query.not('id', 'in', formatInList(excludedList));
-  }
-
-  const profileResponse = await runSupabaseQuery(query, 'Loading discovery profiles');
+  const profileResponse = await runSupabaseQuery(
+    supabase.rpc('discovery_candidates', { p_limit: 40 }),
+    'Loading discovery profiles'
+  );
   const discoveryMode = (currentUser.discovery_mode || 'slow_burn') as DiscoveryMode;
 
-  const profiles = ((profileResponse.data || []) as ExploreProfile[])
+  const profiles = ((profileResponse.data || []) as DiscoveryCandidate[])
+    .filter((candidate) => !excludedUserIds.has(candidate.id))
     .filter((candidate) => candidate.access_state === 'active')
     .filter((candidate) => modeAllowsCandidate(currentUser, candidate, discoveryMode));
 

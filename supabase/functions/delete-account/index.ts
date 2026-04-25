@@ -92,14 +92,10 @@ Deno.serve(async (request) => {
       }
     }
 
-    const { error: blockedUsersError } = await adminClient
-      .from('blocked_users')
-      .delete()
-      .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
-
-    if (blockedUsersError) {
-      console.error('Error removing block records:', blockedUsersError);
-      return json(500, { success: false, error: 'Unable to remove blocked-user records.' });
+    const { error: purgeError } = await adminClient.rpc('purge_user', { p_user: user.id });
+    if (purgeError) {
+      console.error('purge_user failed:', purgeError, 'user:', user.id);
+      return json(500, { success: false, error: 'Unable to clear user data.' });
     }
 
     const { error: deleteUserError } = await adminClient.auth.admin.deleteUser(user.id);

@@ -26,6 +26,7 @@ import {
   type OnboardingStep,
 } from '@/lib/access-state';
 import { getAllowedOnboardingSteps, getNextOnboardingStep } from '@/lib/onboarding';
+import { aboutSchema, nameSchema } from '@/lib/schemas';
 import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
 
 type UserRow = Tables<'users'>;
@@ -206,7 +207,17 @@ const Onboarding = () => {
           ? (profileRow.photo_levels as Record<string, unknown>)
           : null;
       const levelOnePhoto = typeof profilePhotoLevels?.level_1 === 'string' ? profilePhotoLevels.level_1 : undefined;
-      setPhotoPreview(levelOnePhoto || '');
+
+      if (levelOnePhoto) {
+        // After 20260425110000, photo_levels stores storage object paths; sign
+        // them on demand for self-display via the self-read storage policy.
+        const { data: signed } = await supabase.storage
+          .from('profile-photos')
+          .createSignedUrl(levelOnePhoto, 60);
+        setPhotoPreview(signed?.signedUrl || '');
+      } else {
+        setPhotoPreview('');
+      }
 
       await refreshUser();
     } catch (error) {
@@ -249,13 +260,16 @@ const Onboarding = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
-    const maxSize = 8 * 1024 * 1024;
+    // Mirror the upload-verification-doc edge function's allowlist so the user
+    // gets immediate feedback for bad inputs. The server still enforces these
+    // limits authoritatively (including a magic-byte sniff).
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    const maxSize = 5 * 1024 * 1024;
 
     if (!allowedTypes.includes(file.type)) {
       toast({
         title: 'Unsupported file type',
-        description: 'Upload a JPG, PNG, or PDF version of your college ID card.',
+        description: 'Upload a JPG, PNG, WebP, or PDF version of your college ID card.',
         variant: 'destructive',
       });
       return;
@@ -264,7 +278,7 @@ const Onboarding = () => {
     if (file.size > maxSize) {
       toast({
         title: 'File too large',
-        description: 'Keep the file under 8MB.',
+        description: 'Keep the file under 5MB.',
         variant: 'destructive',
       });
       return;
@@ -289,9 +303,10 @@ const Onboarding = () => {
       throw uploadError;
     }
 
-    const { data } = supabase.storage.from('profile-photos').getPublicUrl(fileName);
     setUploadStatus('success');
-    return data.publicUrl;
+    // Bucket is private after 20260425110000; store the storage object path,
+    // not a public URL.
+    return fileName;
   };
 
   const submitStudentIdVerification = async () => {
@@ -308,29 +323,31 @@ const Onboarding = () => {
     }
 
     setStudentIdUploadStatus('uploading');
-    const extension = studentIdFile.name.split('.').pop() || 'jpg';
-    const fileName = `${user.id}/student-id.${extension}`;
 
-    const previousMetadata =
-      studentVerification?.metadata && typeof studentVerification.metadata === 'object' && !Array.isArray(studentVerification.metadata)
-        ? (studentVerification.metadata as Record<string, unknown>)
-        : null;
-    const previousPath = typeof previousMetadata?.document_path === 'string' ? previousMetadata.document_path : null;
+    // After Task 7 (Phase 1 security hardening), the verification-documents
+    // bucket no longer accepts client-side INSERT/UPDATE/DELETE. The
+    // upload-verification-doc edge function performs MIME / size / magic-byte
+    // validation with the service role and returns the canonical storage path.
+    const formData = new FormData();
+    formData.append('file', studentIdFile);
 
-    if (previousPath) {
-      await supabase.storage.from('verification-documents').remove([previousPath]);
-    }
+    const { data: uploadResult, error: uploadError } = await supabase.functions.invoke<{ path: string }>(
+      'upload-verification-doc',
+      { body: formData }
+    );
 
-    const { error: uploadError } = await supabase
-      .storage
-      .from('verification-documents')
-      .upload(fileName, studentIdFile, { upsert: true });
-
-    if (uploadError) {
+    if (uploadError || !uploadResult?.path) {
       setStudentIdUploadStatus('error');
-      throw uploadError;
+      throw uploadError || new Error('Verification upload did not return a storage path.');
     }
 
+    const fileName = uploadResult.path;
+
+    // The edge function already upserted a minimal user_verifications row
+    // (status='pending', source='id_card', document_path=<path>) with the
+    // service role. We re-upsert with the same conflict key so the richer,
+    // user-supplied metadata (submitted_college_name, notes, file_name) is
+    // attached for admin review. This is idempotent.
     const { error: verificationError } = await supabase
       .from('user_verifications')
       .upsert(
@@ -374,6 +391,11 @@ const Onboarding = () => {
         throw new Error('Complete all required basics before continuing.');
       }
 
+      const nameResult = nameSchema.safeParse(formData.name.trim());
+      if (!nameResult.success) {
+        throw new Error(nameResult.error.issues[0]?.message || 'Invalid name.');
+      }
+
       updates.name = formData.name.trim();
       updates.college_name = formData.college_name.trim();
       updates.branch = formData.branch.trim();
@@ -395,6 +417,11 @@ const Onboarding = () => {
         !formData.heartpath_norms_acknowledged
       ) {
         throw new Error('Complete your HeartPath preferences before continuing.');
+      }
+
+      const aboutResult = aboutSchema.safeParse(formData.about.trim());
+      if (!aboutResult.success) {
+        throw new Error(aboutResult.error.issues[0]?.message || 'Invalid bio.');
       }
 
       updates.about = formData.about.trim();
@@ -646,10 +673,10 @@ const Onboarding = () => {
                   <Input
                     id="student_id_file"
                     type="file"
-                    accept="image/jpeg,image/png,image/jpg,application/pdf"
+                    accept="image/jpeg,image/png,image/webp,application/pdf"
                     onChange={handleStudentIdSelect}
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Accepted formats: JPG, PNG, PDF. Max 8MB.</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Accepted formats: JPG, PNG, WebP, PDF. Max 5MB.</p>
                 </div>
               </div>
 

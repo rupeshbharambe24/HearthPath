@@ -5,13 +5,14 @@ import { Heart, MessageSquare, Search, User, Settings, LogOut, LayoutDashboard, 
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { isHeartPathAdmin } from '@/lib/admin';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { data: isAdmin } = useIsAdmin();
 
   const handleLogout = async () => {
     try {
@@ -29,7 +30,7 @@ const Sidebar = () => {
     { name: 'My Profile', href: '/profile', icon: User },
     { name: 'Interactive', href: '/interactive', icon: Zap },
     { name: 'Settings', href: '/settings', icon: Settings },
-    ...(isHeartPathAdmin(user?.email) ? [{ name: 'Verifications', href: '/admin/verifications', icon: ShieldCheck }] : []),
+    ...(isAdmin ? [{ name: 'Verifications', href: '/admin/verifications', icon: ShieldCheck }] : []),
   ];
 
   return (
