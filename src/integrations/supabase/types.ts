@@ -926,6 +926,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      purge_user: {
+        Args: {
+          p_user: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
