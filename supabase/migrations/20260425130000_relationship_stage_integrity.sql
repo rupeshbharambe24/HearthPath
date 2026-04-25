@@ -44,22 +44,35 @@ BEGIN
   -- Resolution (accept / decline / defer) must come from the OTHER member.
   IF OLD.stage_request_status = 'pending'
      AND NEW.stage_request_status IS DISTINCT FROM OLD.stage_request_status THEN
-    IF caller = OLD.stage_request_from_user_id THEN
-      RAISE EXCEPTION 'Originator cannot resolve their own stage request';
-    END IF;
-    IF NEW.stage_request_status = 'declined' THEN
-      NEW.stage_request_cooldown_until := now() + interval '7 days';
+    -- Lifecycle terminations (archive/cooldown) may clear pending requests
+    -- regardless of who initiated — the relationship is ending, not being resolved.
+    IF NEW.lifecycle_state IN ('archived', 'cooldown') THEN
+      -- Allowed; no caller restriction.
+      NULL;
+    ELSE
+      -- Otherwise, only the partner may resolve.
+      IF caller = OLD.stage_request_from_user_id THEN
+        RAISE EXCEPTION 'Originator cannot resolve their own stage request';
+      END IF;
+      IF NEW.stage_request_status = 'declined' THEN
+        NEW.stage_request_cooldown_until := now() + interval '7 days';
+      END IF;
     END IF;
   END IF;
 
   -- current_stage may only advance via accepted request, never set freely.
   IF NEW.current_stage IS DISTINCT FROM OLD.current_stage THEN
-    IF NEW.current_stage <> COALESCE(OLD.requested_stage, NEW.current_stage)
-       AND NEW.current_stage <> 1 THEN -- allow reset to 1 for archive/cooldown bookkeeping
-      RAISE EXCEPTION 'current_stage may only advance to requested_stage via acceptance';
-    END IF;
-    IF caller = OLD.stage_request_from_user_id THEN
-      RAISE EXCEPTION 'Originator cannot self-advance current_stage';
+    -- Lifecycle terminations may reset stage to 1 regardless of caller.
+    IF NEW.lifecycle_state IN ('archived', 'cooldown') AND NEW.current_stage = 1 THEN
+      NULL;
+    ELSE
+      IF NEW.current_stage <> COALESCE(OLD.requested_stage, NEW.current_stage)
+         AND NEW.current_stage <> 1 THEN
+        RAISE EXCEPTION 'current_stage may only advance to requested_stage via acceptance';
+      END IF;
+      IF caller = OLD.stage_request_from_user_id THEN
+        RAISE EXCEPTION 'Originator cannot self-advance current_stage';
+      END IF;
     END IF;
   END IF;
 

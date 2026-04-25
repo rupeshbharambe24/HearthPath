@@ -85,3 +85,22 @@ WHERE id = '<REL_AT_STAGE_2>';
 -- Note: the unique partial index is on (id) WHERE status='pending', enforcing uniqueness
 -- across rows — duplicate rows would violate, but a single row staying pending is fine.
 ROLLBACK;
+
+-- Probe 7: originator may archive their own relationship while their request is pending.
+BEGIN;
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claim.sub" = '<USER_A_UUID>';
+UPDATE public.relationships
+SET stage_request_from_user_id = '<USER_A_UUID>',
+    requested_stage = 3,
+    stage_request_status = 'pending'
+WHERE id = '<REL_AT_STAGE_2>';
+UPDATE public.relationships
+SET lifecycle_state = 'archived',
+    stage_request_status = NULL,
+    stage_request_from_user_id = NULL,
+    requested_stage = NULL,
+    current_stage = 1
+WHERE id = '<REL_AT_STAGE_2>';
+-- Expected: success on both. Originator may end the relationship even with their own pending request.
+ROLLBACK;
