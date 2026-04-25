@@ -5,6 +5,25 @@ admin role server-side. Admin role lookup runs through the
 `public.is_admin()` `SECURITY DEFINER` RPC against the `public.admin_users`
 table.
 
+## On rollout — seed existing admins immediately
+
+The Phase 1 migration (`20260425180000_admin_users.sql`) creates the
+`admin_users` table empty. Anyone who was an admin via the legacy env-var
+allowlist **loses access the moment the migration applies** until they are
+inserted into the table. To avoid an outage:
+
+1. **Before** running `supabase db push` for the Phase 1 migrations, list
+   every email that was in the previous `HEARTPATH_ADMIN_EMAILS` env var.
+2. Run the migration.
+3. Immediately seed those users:
+     ```sql
+     INSERT INTO public.admin_users (user_id, notes)
+     SELECT id, 'Phase 1 bootstrap'
+     FROM public.users
+     WHERE college_email = ANY(ARRAY['admin1@example.com','admin2@example.com']);
+     ```
+4. Confirm with `SELECT count(*) FROM public.admin_users;`.
+
 ## Granting admin access (Phase 1+)
 
 Admin role is now stored in the `admin_users` table. To grant access:
