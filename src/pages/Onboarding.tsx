@@ -206,7 +206,17 @@ const Onboarding = () => {
           ? (profileRow.photo_levels as Record<string, unknown>)
           : null;
       const levelOnePhoto = typeof profilePhotoLevels?.level_1 === 'string' ? profilePhotoLevels.level_1 : undefined;
-      setPhotoPreview(levelOnePhoto || '');
+
+      if (levelOnePhoto) {
+        // After 20260425110000, photo_levels stores storage object paths; sign
+        // them on demand for self-display via the self-read storage policy.
+        const { data: signed } = await supabase.storage
+          .from('profile-photos')
+          .createSignedUrl(levelOnePhoto, 60);
+        setPhotoPreview(signed?.signedUrl || '');
+      } else {
+        setPhotoPreview('');
+      }
 
       await refreshUser();
     } catch (error) {
@@ -289,9 +299,10 @@ const Onboarding = () => {
       throw uploadError;
     }
 
-    const { data } = supabase.storage.from('profile-photos').getPublicUrl(fileName);
     setUploadStatus('success');
-    return data.publicUrl;
+    // Bucket is private after 20260425110000; store the storage object path,
+    // not a public URL.
+    return fileName;
   };
 
   const submitStudentIdVerification = async () => {

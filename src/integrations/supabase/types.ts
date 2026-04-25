@@ -919,6 +919,13 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Tables"]["users"]["Row"]
       }
+      viewer_can_see_photo_level: {
+        Args: {
+          p_target: string
+          p_level: number
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
