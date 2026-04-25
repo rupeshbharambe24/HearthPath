@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { ExternalLink, ShieldCheck } from 'lucide-react';
 import AuthenticatedLayout from '@/components/AuthenticatedLayout';
-import { useAuth } from '@/contexts/AuthContext';
-import { isHeartPathAdmin } from '@/lib/admin';
+import FullscreenLoader from '@/components/FullscreenLoader';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,12 +31,12 @@ type Submission = {
 };
 
 const AdminVerifications = () => {
-  const { user, isLoading } = useAuth();
+  const { data: isAdmin, isLoading: isAdminLoading } = useIsAdmin();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [notesByUser, setNotesByUser] = useState<Record<string, string>>({});
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
-  const adminAllowed = isHeartPathAdmin(user?.email);
+  const adminAllowed = Boolean(isAdmin);
 
   const loadSubmissions = async () => {
     try {
@@ -100,7 +100,11 @@ const AdminVerifications = () => {
     }
   };
 
-  if (!isLoading && !adminAllowed) {
+  if (isAdminLoading) {
+    return <FullscreenLoader label="Verifying access..." />;
+  }
+
+  if (!adminAllowed) {
     return <Navigate to="/dashboard" replace />;
   }
 

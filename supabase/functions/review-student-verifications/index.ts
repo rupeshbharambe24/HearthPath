@@ -21,12 +21,6 @@ const json = (status: number, body: Record<string, unknown>) =>
     },
   });
 
-const getAdminEmails = () =>
-  (Deno.env.get('HEARTPATH_ADMIN_EMAILS') || '')
-    .split(',')
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -78,9 +72,9 @@ Deno.serve(async (request) => {
       return json(401, { success: false, error: 'Unable to verify the current admin user.' });
     }
 
-    const adminEmails = getAdminEmails();
-    if (!adminEmails.includes(user.email.toLowerCase())) {
-      return json(403, { success: false, error: 'This account is not allowed to review student verifications.' });
+    const { data: isAdminFlag, error: adminCheckErr } = await authClient.rpc('is_admin');
+    if (adminCheckErr || !isAdminFlag) {
+      return json(403, { success: false, error: 'Admin access required.' });
     }
 
     const payload = (await request.json().catch(() => ({}))) as ReviewRequest;

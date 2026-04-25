@@ -867,6 +867,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       check_college_email_domain: {
         Args: {
           email: string
