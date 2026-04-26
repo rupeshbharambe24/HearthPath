@@ -110,8 +110,12 @@ BEGIN
   END IF;
 
   -- Breakup (active/exclusive/paused -> archived/cooldown). Notify the other party.
+  -- Skip when auth.uid() is NULL (e.g. service-role driven backfill / admin tool):
+  -- without a known initiator we'd attribute the breakup to nobody and the
+  -- "partner" lookup would also collapse, so silence is the safer default.
   IF OLD.lifecycle_state IN ('active', 'exclusive', 'paused')
-     AND NEW.lifecycle_state IN ('archived', 'cooldown') THEN
+     AND NEW.lifecycle_state IN ('archived', 'cooldown')
+     AND auth.uid() IS NOT NULL THEN
     partner := CASE WHEN auth.uid() = OLD.user_a THEN OLD.user_b ELSE OLD.user_a END;
     PERFORM public.create_notification(
       partner, auth.uid(), 'breakup_initiated',
