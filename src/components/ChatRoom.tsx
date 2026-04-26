@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getLevelGlow } from '@/lib/animations';
 import { messageSchema } from '@/lib/schemas';
+import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 
 interface ChatRoomProps {
   partnerId: string;
@@ -33,6 +34,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
 
   const messages = getMessagesWithPartner(partnerId);
   const partnerUnread = unreadFromPartner(partnerId);
+  const { partnerTyping, emitTyping } = useTypingIndicator(user?.id, partnerId);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -195,11 +197,19 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.15 }}
               >
+                {partnerTyping && (
+                  <div className="text-xs text-muted-foreground italic px-3 pb-1">
+                    {matchName} is typing…
+                  </div>
+                )}
                 <div className="flex space-x-2">
                   <Input
                     placeholder="Type your message..."
                     value={message}
-                    onChange={(e) => setMessage(e.target.value)}
+                    onChange={(e) => {
+                      setMessage(e.target.value);
+                      emitTyping();
+                    }}
                     onKeyPress={handleKeyPress}
                     className="flex-1 transition-shadow duration-200 focus:shadow-md focus:shadow-romantic-red/10"
                     disabled={sending}
