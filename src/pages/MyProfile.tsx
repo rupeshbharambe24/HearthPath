@@ -5,8 +5,10 @@ import PhotoManager from '@/components/PhotoManager';
 import LevelPreview from '@/components/LevelPreview';
 import EditableField from '@/components/EditableField';
 import VerificationStatusCard from '@/components/VerificationStatusCard';
+import SelfieCapture from '@/components/SelfieCapture';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { User, Camera, Eye } from 'lucide-react';
 import { useUserData } from '@/hooks/useUserData';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,6 +32,36 @@ const MyProfile = () => {
     hobbies: '',
     about: '',
   });
+
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [photoSubmitting, setPhotoSubmitting] = useState(false);
+  const photoVerified = user?.verificationBadges?.photo_verified === true;
+
+  async function handlePhotoSubmit(blob: Blob, mimeType: string) {
+    setPhotoSubmitting(true);
+    try {
+      const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+      const file = new File([blob], `selfie.${ext}`, { type: mimeType });
+      const fd = new FormData();
+      fd.append('file', file);
+      const { error } = await supabase.functions.invoke('upload-photo-verification', { body: fd });
+      if (error) throw error;
+      toast({
+        title: 'Selfie submitted',
+        description: 'An admin will review and approve shortly.',
+      });
+      setPhotoOpen(false);
+      await refreshUser?.();
+    } catch (err) {
+      toast({
+        title: 'Selfie submission failed',
+        description: err instanceof Error ? err.message : 'Try again',
+        variant: 'destructive',
+      });
+    } finally {
+      setPhotoSubmitting(false);
+    }
+  }
 
   // Initialize form data when profile loads
   React.useEffect(() => {
@@ -141,13 +173,47 @@ const MyProfile = () => {
             </div>
 
             {user ? (
-              <div className="mb-8">
+              <div className="mb-8 space-y-4">
                 <VerificationStatusCard
                   profileCompleteness={user.profileCompleteness}
                   verificationBadges={user.verificationBadges}
                   title="Verification Status"
                   description="Verified access and profile completeness help HeartPath stay college-only and trust-first."
                 />
+                <Card className="romantic-card">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-lg">
+                      <Camera className="w-5 h-5" />
+                      <span>Photo verification</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {photoVerified ? (
+                      <div className="text-sm text-green-600">Photo verified ✓</div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Confirm your identity by submitting a quick selfie. An admin will compare it with your student ID.
+                        </p>
+                        <Button onClick={() => setPhotoOpen(true)} variant="outline" size="sm">
+                          Verify your photo
+                        </Button>
+                        <Dialog open={photoOpen} onOpenChange={setPhotoOpen}>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Verify your photo</DialogTitle>
+                            </DialogHeader>
+                            <SelfieCapture
+                              onSubmit={handlePhotoSubmit}
+                              onCancel={() => setPhotoOpen(false)}
+                              isSubmitting={photoSubmitting}
+                            />
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             ) : null}
 
