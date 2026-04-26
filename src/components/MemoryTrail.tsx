@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
 import { getStageName } from '@/lib/heartpath';
 import { memorySchema } from '@/lib/schemas';
+import MemoryAttachment from '@/components/MemoryAttachment';
 
 type MemoryEntry = Tables<'memories'>;
 
@@ -567,6 +568,16 @@ const MemoryTrail: React.FC<MemoryTrailProps> = ({
                     </div>
 
                     <p className="text-sm text-gray-700 dark:text-gray-200 mb-2">{memory.memo_text}</p>
+
+                    {memory.attachment_url ? (
+                      <div className="mb-2">
+                        <MemoryAttachment
+                          memoryId={memory.id}
+                          attachmentUrl={memory.attachment_url}
+                          attachmentType={memory.attachment_type as 'image' | 'audio' | 'pdf' | null}
+                        />
+                      </div>
+                    ) : null}
 
                     {memory.reflection_follow_up ? (
                       <p className="text-xs text-gray-600 dark:text-gray-300 mb-2">
