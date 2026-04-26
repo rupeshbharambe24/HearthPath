@@ -59,6 +59,7 @@ USING (recipient_user_id = auth.uid());
 CREATE OR REPLACE FUNCTION public.check_notification_update()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = ''
 AS $$
 BEGIN
   IF NEW.recipient_user_id IS DISTINCT FROM OLD.recipient_user_id
