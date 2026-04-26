@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import Sidebar from './Sidebar';
 import ThemeToggle from './ThemeToggle';
+import NotificationBell from './NotificationBell';
 import { Heart } from 'lucide-react';
 
 interface AuthenticatedLayoutProps {
@@ -24,7 +25,15 @@ const AuthenticatedLayout: React.FC<AuthenticatedLayoutProps> = ({ children }) =
             HeartPath
           </span>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-1">
+          <NotificationBell />
+          <ThemeToggle />
+        </div>
+      </div>
+
+      {/* Desktop top-right action bar - sits above the main content */}
+      <div className="hidden lg:flex fixed top-3 right-4 z-40 items-center gap-1">
+        <NotificationBell />
       </div>
 
       {/* Main content area - offset for sidebar on desktop, offset for mobile nav at bottom */}
