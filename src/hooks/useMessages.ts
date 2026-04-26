@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { runSupabaseQuery } from '@/lib/supabase-query';
@@ -11,6 +11,7 @@ interface Message {
   receiver_id: string;
   created_at: string;
   content_type: string;
+  read_at: string | null;
 }
 
 interface ChatPreview {
@@ -51,6 +52,14 @@ async function fetchMessagesData(userId: string) {
     partnerMap = new Map((partnerResponse.data || []).map((partner) => [partner.id, partner.name]));
   }
 
+  const unreadCountByPartner = new Map<string, number>();
+  for (const message of messages) {
+    if (message.receiver_id === userId && !message.read_at) {
+      const partnerId = message.sender_id;
+      unreadCountByPartner.set(partnerId, (unreadCountByPartner.get(partnerId) || 0) + 1);
+    }
+  }
+
   const previewMap = new Map<string, ChatPreview>();
   for (const message of messages) {
     const partnerId = message.sender_id === userId ? message.receiver_id : message.sender_id;
@@ -62,9 +71,14 @@ async function fetchMessagesData(userId: string) {
         partnerName: partnerMap.get(partnerId) || 'Unknown User',
         lastMessage: message.content || '',
         lastMessageTime: message.created_at,
-        unreadCount: 0,
+        unreadCount: unreadCountByPartner.get(partnerId) || 0,
       });
     }
+  }
+
+  // Ensure unreadCount stays accurate even when last message is from the user.
+  for (const preview of previewMap.values()) {
+    preview.unreadCount = unreadCountByPartner.get(preview.partnerId) || 0;
   }
 
   return {
@@ -111,17 +125,54 @@ export const useMessages = () => {
     };
   }, [queryClient, user?.id]);
 
+  const messages = query.data?.messages || [];
+
   const getMessagesWithPartner = (partnerId: string) =>
-    (query.data?.messages || []).filter(
+    messages.filter(
       (message) =>
         (message.sender_id === user?.id && message.receiver_id === partnerId) ||
         (message.sender_id === partnerId && message.receiver_id === user?.id)
     );
 
+  const unreadCount = messages.filter(
+    (m) => m.receiver_id === user?.id && !m.read_at
+  ).length;
+
+  const unreadFromPartner = (partnerId: string): number => {
+    if (!user?.id) return 0;
+    return messages.filter(
+      (m) =>
+        m.sender_id === partnerId &&
+        m.receiver_id === user.id &&
+        !m.read_at
+    ).length;
+  };
+
+  const markThreadReadMutation = useMutation({
+    mutationFn: async (partnerId: string) => {
+      if (!user?.id) return;
+      const { error } = await supabase
+        .from('messages')
+        .update({ read_at: new Date().toISOString() })
+        .eq('sender_id', partnerId)
+        .eq('receiver_id', user.id)
+        .is('read_at', null);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      if (user?.id) queryClient.invalidateQueries({ queryKey: ['messages', user.id] });
+    },
+  });
+
+  const markThreadRead = (partnerId: string) => markThreadReadMutation.mutate(partnerId);
+
   return {
-    messages: query.data?.messages || [],
+    messages,
     chatPreviews: query.data?.chatPreviews || [],
     loading: query.isLoading,
     getMessagesWithPartner,
+    unreadCount,
+    unreadFromPartner,
+    markThreadRead,
   };
 };

@@ -26,12 +26,13 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const { user } = useAuth();
-  const { getMessagesWithPartner } = useMessages();
+  const { getMessagesWithPartner, unreadFromPartner, markThreadRead } = useMessages();
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null);
 
   const messages = getMessagesWithPartner(partnerId);
+  const partnerUnread = unreadFromPartner(partnerId);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -40,6 +41,12 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    if (partnerUnread === 0) return;
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+    markThreadRead(partnerId);
+  }, [partnerUnread, partnerId, markThreadRead]);
 
   const getChatBackgroundClass = (level: number) => {
     const backgrounds = {
@@ -173,6 +180,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
                           minute: '2-digit'
                         })}
                         senderName={msg.sender_id === user?.id ? undefined : matchName}
+                        readAt={msg.read_at}
                       />
                     ))
                   )}

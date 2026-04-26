@@ -335,6 +335,7 @@ export type Database = {
           content_type: string | null
           created_at: string | null
           id: string
+          read_at: string | null
           receiver_id: string | null
           sender_id: string | null
         }
@@ -343,6 +344,7 @@ export type Database = {
           content_type?: string | null
           created_at?: string | null
           id?: string
+          read_at?: string | null
           receiver_id?: string | null
           sender_id?: string | null
         }
@@ -351,6 +353,7 @@ export type Database = {
           content_type?: string | null
           created_at?: string | null
           id?: string
+          read_at?: string | null
           receiver_id?: string | null
           sender_id?: string | null
         }
