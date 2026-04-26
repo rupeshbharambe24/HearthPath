@@ -668,6 +668,73 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          id: string
+          kind:
+            | "stage_requested"
+            | "stage_accepted"
+            | "stage_declined"
+            | "stage_deferred"
+            | "permission_granted"
+            | "permission_revoked"
+            | "heart_received"
+            | "message_received"
+            | "invitation_received"
+            | "invitation_accepted"
+            | "invitation_declined"
+            | "breakup_initiated"
+          payload: Json
+          read_at: string | null
+          recipient_user_id: string
+          related_id: string | null
+          related_kind: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          kind:
+            | "stage_requested"
+            | "stage_accepted"
+            | "stage_declined"
+            | "stage_deferred"
+            | "permission_granted"
+            | "permission_revoked"
+            | "heart_received"
+            | "message_received"
+            | "invitation_received"
+            | "invitation_accepted"
+            | "invitation_declined"
+            | "breakup_initiated"
+          payload?: Json
+          read_at?: string | null
+          recipient_user_id: string
+          related_id?: string | null
+          related_kind?: string | null
+        }
+        Update: {
+          read_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_recipient_user_id_fkey"
+            columns: ["recipient_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       weekly_checkins: {
         Row: {
           created_at: string
@@ -881,6 +948,29 @@ export type Database = {
           domain: string | null
           normalized_email: string | null
         }[]
+      }
+      create_notification: {
+        Args: {
+          p_recipient: string
+          p_actor: string
+          p_kind:
+            | "stage_requested"
+            | "stage_accepted"
+            | "stage_declined"
+            | "stage_deferred"
+            | "permission_granted"
+            | "permission_revoked"
+            | "heart_received"
+            | "message_received"
+            | "invitation_received"
+            | "invitation_accepted"
+            | "invitation_declined"
+            | "breakup_initiated"
+          p_payload?: Json
+          p_related_kind?: string
+          p_related_id?: string
+        }
+        Returns: string | null
       }
       blocked_user_summaries: {
         Args: Record<PropertyKey, never>
