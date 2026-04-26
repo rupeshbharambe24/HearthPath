@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Heart, Plus } from 'lucide-react';
+import { Heart, Paperclip, Plus, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -28,8 +28,30 @@ interface MemoryTrailProps {
     mood?: string;
     tags?: string[];
     reflection_follow_up?: string;
+    attachment_url?: string | null;
+    attachment_type?: 'image' | 'audio' | 'pdf' | null;
   }) => Promise<{ success: boolean; error?: string }>;
 }
+
+const ATTACHMENT_ACCEPT =
+  'image/jpeg,image/png,image/webp,audio/mpeg,audio/wav,audio/webm,audio/ogg,application/pdf';
+const ATTACHMENT_ALLOWED_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'audio/mpeg',
+  'audio/wav',
+  'audio/webm',
+  'audio/ogg',
+  'application/pdf',
+]);
+const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+
+const formatFileSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 const MEMORY_TYPES = [
   { value: 'good_moment', label: 'Good moment' },
@@ -59,6 +81,9 @@ const MemoryTrail: React.FC<MemoryTrailProps> = ({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [resolvedRelationshipId, setResolvedRelationshipId] = useState<string | null>(relationshipId || null);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -150,6 +175,37 @@ const MemoryTrail: React.FC<MemoryTrailProps> = ({
     setMemoryMood('');
     setMemoryTags('');
     setReflectionFollowUp('');
+    setAttachmentFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleAttachmentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!ATTACHMENT_ALLOWED_TYPES.has(file.type)) {
+      toast({
+        title: 'Unsupported attachment',
+        description: 'Use a JPG/PNG/WebP image, MP3/WAV/Ogg/WebM audio, or a PDF.',
+        variant: 'destructive',
+      });
+      event.target.value = '';
+      return;
+    }
+    if (file.size > ATTACHMENT_MAX_BYTES) {
+      toast({
+        title: 'Attachment too large',
+        description: 'Attachments must be 10 MB or smaller.',
+        variant: 'destructive',
+      });
+      event.target.value = '';
+      return;
+    }
+    setAttachmentFile(file);
+  };
+
+  const clearAttachment = () => {
+    setAttachmentFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleAddMemory = async () => {
@@ -165,7 +221,7 @@ const MemoryTrail: React.FC<MemoryTrailProps> = ({
     }
 
     try {
-      const payload = {
+      const basePayload = {
         memo_text: newMemory.trim(),
         entry_type: memoryType,
         visibility: memoryVisibility,
@@ -178,9 +234,9 @@ const MemoryTrail: React.FC<MemoryTrailProps> = ({
       };
 
       const parsed = memorySchema.safeParse({
-        memo_text: payload.memo_text,
-        entry_type: payload.entry_type,
-        visibility: payload.visibility,
+        memo_text: basePayload.memo_text,
+        entry_type: basePayload.entry_type,
+        visibility: basePayload.visibility,
       });
       if (!parsed.success) {
         toast({
@@ -190,6 +246,51 @@ const MemoryTrail: React.FC<MemoryTrailProps> = ({
         });
         return;
       }
+
+      let attachmentUrl: string | null = null;
+      let attachmentType: 'image' | 'audio' | 'pdf' | null = null;
+
+      if (attachmentFile) {
+        if (!resolvedRelationshipId) {
+          toast({
+            title: 'Cannot upload attachment',
+            description: 'No active relationship for this memory yet.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        try {
+          setIsUploadingAttachment(true);
+          const formData = new FormData();
+          formData.append('relationship_id', resolvedRelationshipId);
+          formData.append('file', attachmentFile);
+          const { data: uploadData, error: uploadError } = await supabase.functions.invoke<{
+            path: string;
+            attachment_type: 'image' | 'audio' | 'pdf';
+          }>('upload-memory-attachment', { body: formData });
+          if (uploadError || !uploadData) {
+            toast({
+              title: 'Attachment upload failed',
+              description:
+                uploadError?.message ||
+                'We could not upload that file. Clear it and try again, or save the memory without an attachment.',
+              variant: 'destructive',
+            });
+            return;
+          }
+          attachmentUrl = uploadData.path;
+          attachmentType = uploadData.attachment_type;
+        } finally {
+          setIsUploadingAttachment(false);
+        }
+      }
+
+      const payload = {
+        ...basePayload,
+        attachment_url: attachmentUrl,
+        attachment_type: attachmentType,
+      };
 
       const result = onCreateMemory
         ? await onCreateMemory(payload)
@@ -366,9 +467,52 @@ const MemoryTrail: React.FC<MemoryTrailProps> = ({
                   className="min-h-20"
                 />
 
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={ATTACHMENT_ACCEPT}
+                    className="hidden"
+                    onChange={handleAttachmentChange}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingAttachment}
+                  >
+                    <Paperclip className="w-4 h-4 mr-1" />
+                    {attachmentFile ? 'Replace attachment' : 'Add attachment'}
+                  </Button>
+                  {attachmentFile ? (
+                    <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-border/50 bg-muted/40 px-3 py-2 text-xs">
+                      <span className="truncate">
+                        {attachmentFile.name} · {formatFileSize(attachmentFile.size)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={clearAttachment}
+                        className="rounded p-1 hover:bg-muted text-muted-foreground"
+                        aria-label="Remove attachment"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Optional. Image, audio, or PDF up to 10 MB.
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex gap-2">
-                  <Button onClick={handleAddMemory} className="romantic-btn flex-1" disabled={!newMemory.trim()}>
-                    Save Memory
+                  <Button
+                    onClick={handleAddMemory}
+                    className="romantic-btn flex-1"
+                    disabled={!newMemory.trim() || isUploadingAttachment}
+                  >
+                    {isUploadingAttachment ? 'Uploading…' : 'Save Memory'}
                   </Button>
                   <Button
                     variant="outline"
@@ -377,6 +521,7 @@ const MemoryTrail: React.FC<MemoryTrailProps> = ({
                       setIsDialogOpen(false);
                     }}
                     className="flex-1"
+                    disabled={isUploadingAttachment}
                   >
                     Cancel
                   </Button>
