@@ -188,6 +188,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase.channel(`presence-${user.id}`, {
+      config: { presence: { key: user.id } },
+    });
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.track({ online_at: new Date().toISOString() });
+      }
+    });
+    return () => {
+      void channel.untrack();
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);

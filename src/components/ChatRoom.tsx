@@ -15,6 +15,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getLevelGlow } from '@/lib/animations';
 import { messageSchema } from '@/lib/schemas';
+import { useTypingIndicator } from '@/hooks/useTypingIndicator';
+import { usePresence } from '@/hooks/usePresence';
+import PresenceDot from './PresenceDot';
 
 interface ChatRoomProps {
   partnerId: string;
@@ -26,12 +29,15 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const { user } = useAuth();
-  const { getMessagesWithPartner } = useMessages();
+  const { getMessagesWithPartner, unreadFromPartner, markThreadRead } = useMessages();
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null);
 
   const messages = getMessagesWithPartner(partnerId);
+  const partnerUnread = unreadFromPartner(partnerId);
+  const { partnerTyping, emitTyping } = useTypingIndicator(user?.id, partnerId);
+  const partnerOnline = usePresence(partnerId);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -40,6 +46,12 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    if (partnerUnread === 0) return;
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+    markThreadRead(partnerId);
+  }, [partnerUnread, partnerId, markThreadRead]);
 
   const getChatBackgroundClass = (level: number) => {
     const backgrounds = {
@@ -120,7 +132,13 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
             transition={{ duration: 0.3 }}
           >
             <CardTitle className="text-xl font-semibold text-gray-800 dark:text-gray-200">
-              {matchName}
+              <div className="flex items-center gap-2">
+                <PresenceDot online={partnerOnline} />
+                <span>{matchName}</span>
+                <span className="text-xs text-muted-foreground">
+                  {partnerOnline ? 'Online' : 'Offline'}
+                </span>
+              </div>
             </CardTitle>
             <RelationshipBadge level={relationshipLevel} />
           </motion.div>
@@ -173,6 +191,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
                           minute: '2-digit'
                         })}
                         senderName={msg.sender_id === user?.id ? undefined : matchName}
+                        readAt={msg.read_at}
                       />
                     ))
                   )}
@@ -187,11 +206,19 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.15 }}
               >
+                {partnerTyping && (
+                  <div className="text-xs text-muted-foreground italic px-3 pb-1">
+                    {matchName} is typing…
+                  </div>
+                )}
                 <div className="flex space-x-2">
                   <Input
                     placeholder="Type your message..."
                     value={message}
-                    onChange={(e) => setMessage(e.target.value)}
+                    onChange={(e) => {
+                      setMessage(e.target.value);
+                      emitTyping();
+                    }}
                     onKeyPress={handleKeyPress}
                     className="flex-1 transition-shadow duration-200 focus:shadow-md focus:shadow-romantic-red/10"
                     disabled={sending}

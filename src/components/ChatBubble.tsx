@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { Check, CheckCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { bubbleVariants } from '@/lib/animations';
 
@@ -8,13 +9,15 @@ interface ChatBubbleProps {
   isOwn: boolean;
   timestamp: string;
   senderName?: string;
+  readAt?: string | null;
 }
 
 const ChatBubble: React.FC<ChatBubbleProps> = ({
   message,
   isOwn,
   timestamp,
-  senderName
+  senderName,
+  readAt,
 }) => {
   return (
     <motion.div
@@ -42,12 +45,30 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({
           </p>
         )}
         <p className="text-sm leading-relaxed">{message}</p>
-        <p className={cn(
-          "text-xs mt-1",
-          isOwn ? "text-white/70" : "text-gray-500 dark:text-gray-400"
+        <div className={cn(
+          "flex items-center gap-1 mt-1",
+          isOwn ? "justify-end" : "justify-start"
         )}>
-          {timestamp}
-        </p>
+          <p className={cn(
+            "text-xs",
+            isOwn ? "text-white/70" : "text-gray-500 dark:text-gray-400"
+          )}>
+            {timestamp}
+          </p>
+          {isOwn && (
+            readAt ? (
+              <CheckCheck
+                className="h-3 w-3 text-sky-200"
+                aria-label="Read"
+              />
+            ) : (
+              <Check
+                className="h-3 w-3 text-white/70"
+                aria-label="Sent"
+              />
+            )
+          )}
+        </div>
       </motion.div>
     </motion.div>
   );
