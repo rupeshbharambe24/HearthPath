@@ -28,6 +28,8 @@ import {
 import { getAllowedOnboardingSteps, getNextOnboardingStep } from '@/lib/onboarding';
 import { aboutSchema, nameSchema } from '@/lib/schemas';
 import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
+import { useOnboardingAutosave } from '@/hooks/useOnboardingAutosave';
+import AutosaveStatus from '@/components/AutosaveStatus';
 
 type UserRow = Tables<'users'>;
 type VerificationRow = Tables<'user_verifications'>;
@@ -111,6 +113,7 @@ const Onboarding = () => {
   const { user, refreshUser, resendVerificationEmail, logout } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const autosave = useOnboardingAutosave();
 
   const verificationBadges = useMemo(
     () => normalizeVerificationBadges(profile?.verification_badges ?? user?.verificationBadges ?? null),
@@ -237,12 +240,34 @@ const Onboarding = () => {
   };
 
   const toggleChipValue = (field: 'hobbies' | 'boundary_topics' | 'value_tags' | 'lifestyle_preferences' | 'deal_breakers', value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: prev[field].includes(value)
+    setFormData((prev) => {
+      const next = prev[field].includes(value)
         ? prev[field].filter((item) => item !== value)
-        : [...prev[field], value],
-    }));
+        : [...prev[field], value];
+      void autosave.saveFieldNow(field, next);
+      return { ...prev, [field]: next };
+    });
+  };
+
+  // Remove a value from one of the array fields and autosave the new array.
+  const removeFromArray = (
+    field: 'languages' | 'boundary_topics' | 'value_tags' | 'lifestyle_preferences' | 'deal_breakers' | 'hobbies',
+    value: string
+  ) => {
+    setFormData((prev) => {
+      const next = prev[field].filter((item) => item !== value);
+      void autosave.saveFieldNow(field, next);
+      return { ...prev, [field]: next };
+    });
+  };
+
+  // Tick the heartpath norms checkbox. Local state stores the boolean for
+  // the existing validation in saveStep; autosave persists the canonical
+  // timestamp column on the users row. Unticking clears the timestamp.
+  const ackNorms = (checked: boolean) => {
+    setFormData((prev) => ({ ...prev, heartpath_norms_acknowledged: checked }));
+    const ts = checked ? new Date().toISOString() : null;
+    void autosave.saveFieldNow('heartpath_norms_acknowledged_at', ts);
   };
 
   const handlePhotoSelect = (file: File) => {
@@ -479,6 +504,12 @@ const Onboarding = () => {
   };
 
   const handleContinue = async () => {
+    // Drain any pending debounced autosave before the bulk save below
+    // attempts to advance the onboarding step. The bulk save in saveStep
+    // remains as an idempotent safety net for fields autosave may have
+    // missed (e.g. when the user clicks Continue mid-typing).
+    await autosave.flush();
+
     if (activeStep === 'verify') {
       if (accessState === 'blocked') return;
       if (!verificationBadges.email_verified || !verificationBadges.student_verified) {
@@ -529,35 +560,45 @@ const Onboarding = () => {
   const addCustomLanguage = () => {
     const value = customLanguage.trim();
     if (!value || formData.languages.includes(value)) return;
-    handleInputChange('languages', [...formData.languages, value]);
+    const next = [...formData.languages, value];
+    handleInputChange('languages', next);
+    void autosave.saveFieldNow('languages', next);
     setCustomLanguage('');
   };
 
   const addCustomBoundary = () => {
     const value = customBoundary.trim();
     if (!value || formData.boundary_topics.includes(value)) return;
-    handleInputChange('boundary_topics', [...formData.boundary_topics, value]);
+    const next = [...formData.boundary_topics, value];
+    handleInputChange('boundary_topics', next);
+    void autosave.saveFieldNow('boundary_topics', next);
     setCustomBoundary('');
   };
 
   const addCustomDealBreaker = () => {
     const value = customDealBreaker.trim();
     if (!value || formData.deal_breakers.includes(value)) return;
-    handleInputChange('deal_breakers', [...formData.deal_breakers, value]);
+    const next = [...formData.deal_breakers, value];
+    handleInputChange('deal_breakers', next);
+    void autosave.saveFieldNow('deal_breakers', next);
     setCustomDealBreaker('');
   };
 
   const addCustomValue = () => {
     const value = customValue.trim();
     if (!value || formData.value_tags.includes(value)) return;
-    handleInputChange('value_tags', [...formData.value_tags, value]);
+    const next = [...formData.value_tags, value];
+    handleInputChange('value_tags', next);
+    void autosave.saveFieldNow('value_tags', next);
     setCustomValue('');
   };
 
   const addCustomLifestyle = () => {
     const value = customLifestyle.trim();
     if (!value || formData.lifestyle_preferences.includes(value)) return;
-    handleInputChange('lifestyle_preferences', [...formData.lifestyle_preferences, value]);
+    const next = [...formData.lifestyle_preferences, value];
+    handleInputChange('lifestyle_preferences', next);
+    void autosave.saveFieldNow('lifestyle_preferences', next);
     setCustomLifestyle('');
   };
 
@@ -744,74 +785,121 @@ const Onboarding = () => {
   };
 
   const renderBasicsStep = () => (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <div className="space-y-2">
-        <Label htmlFor="name">Full Name *</Label>
-        <Input id="name" value={formData.name} onChange={(e) => handleInputChange('name', e.target.value)} />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="college_name">College Name *</Label>
-        <Input
-          id="college_name"
-          value={formData.college_name}
-          onChange={(e) => handleInputChange('college_name', e.target.value)}
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <AutosaveStatus
+          status={autosave.status}
+          lastSavedAt={autosave.lastSavedAt}
+          errorMessage={autosave.errorMessage}
         />
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="branch">Branch / Major *</Label>
-        <Input id="branch" value={formData.branch} onChange={(e) => handleInputChange('branch', e.target.value)} />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="year">Academic Year *</Label>
-        <Select value={formData.year} onValueChange={(value) => handleInputChange('year', value)}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select year" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1">1st Year</SelectItem>
-            <SelectItem value="2">2nd Year</SelectItem>
-            <SelectItem value="3">3rd Year</SelectItem>
-            <SelectItem value="4">4th Year</SelectItem>
-            <SelectItem value="5">Graduate</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="pronouns">Pronouns</Label>
-        <Input id="pronouns" value={formData.pronouns} onChange={(e) => handleInputChange('pronouns', e.target.value)} />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="campus_zone">Campus Zone</Label>
-        <Input
-          id="campus_zone"
-          value={formData.campus_zone}
-          onChange={(e) => handleInputChange('campus_zone', e.target.value)}
-          placeholder="Hostel block, central campus, library side..."
-        />
-      </div>
-      <div className="space-y-2 md:col-span-2">
-        <Label>Languages</Label>
-        <div className="mb-3 flex flex-wrap gap-2">
-          {formData.languages.map((language) => (
-            <button
-              key={language}
-              type="button"
-              onClick={() => handleInputChange('languages', formData.languages.filter((item) => item !== language))}
-              className="rounded-full bg-romantic-light-pink px-3 py-1 text-sm text-romantic-red"
-            >
-              {language} ×
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="name">Full Name *</Label>
           <Input
-            value={customLanguage}
-            onChange={(e) => setCustomLanguage(e.target.value)}
-            placeholder="Add a language"
+            id="name"
+            value={formData.name}
+            onChange={(e) => {
+              handleInputChange('name', e.target.value);
+              autosave.saveField('name', e.target.value);
+            }}
+            onBlur={() => { void autosave.flush(); }}
           />
-          <Button type="button" variant="outline" onClick={addCustomLanguage}>
-            Add
-          </Button>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="college_name">College Name *</Label>
+          <Input
+            id="college_name"
+            value={formData.college_name}
+            onChange={(e) => {
+              handleInputChange('college_name', e.target.value);
+              autosave.saveField('college_name', e.target.value);
+            }}
+            onBlur={() => { void autosave.flush(); }}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="branch">Branch / Major *</Label>
+          <Input
+            id="branch"
+            value={formData.branch}
+            onChange={(e) => {
+              handleInputChange('branch', e.target.value);
+              autosave.saveField('branch', e.target.value);
+            }}
+            onBlur={() => { void autosave.flush(); }}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="year">Academic Year *</Label>
+          <Select
+            value={formData.year}
+            onValueChange={(value) => {
+              handleInputChange('year', value);
+              void autosave.saveFieldNow('year', value === '' ? null : Number(value));
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select year" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">1st Year</SelectItem>
+              <SelectItem value="2">2nd Year</SelectItem>
+              <SelectItem value="3">3rd Year</SelectItem>
+              <SelectItem value="4">4th Year</SelectItem>
+              <SelectItem value="5">Graduate</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="pronouns">Pronouns</Label>
+          <Input
+            id="pronouns"
+            value={formData.pronouns}
+            onChange={(e) => {
+              handleInputChange('pronouns', e.target.value);
+              autosave.saveField('pronouns', e.target.value);
+            }}
+            onBlur={() => { void autosave.flush(); }}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="campus_zone">Campus Zone</Label>
+          <Input
+            id="campus_zone"
+            value={formData.campus_zone}
+            onChange={(e) => {
+              handleInputChange('campus_zone', e.target.value);
+              autosave.saveField('campus_zone', e.target.value);
+            }}
+            onBlur={() => { void autosave.flush(); }}
+            placeholder="Hostel block, central campus, library side..."
+          />
+        </div>
+        <div className="space-y-2 md:col-span-2">
+          <Label>Languages</Label>
+          <div className="mb-3 flex flex-wrap gap-2">
+            {formData.languages.map((language) => (
+              <button
+                key={language}
+                type="button"
+                onClick={() => removeFromArray('languages', language)}
+                className="rounded-full bg-romantic-light-pink px-3 py-1 text-sm text-romantic-red"
+              >
+                {language} ×
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={customLanguage}
+              onChange={(e) => setCustomLanguage(e.target.value)}
+              placeholder="Add a language"
+            />
+            <Button type="button" variant="outline" onClick={addCustomLanguage}>
+              Add
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -819,12 +907,23 @@ const Onboarding = () => {
 
   const renderHeartPathStep = () => (
     <div className="space-y-5">
+      <div className="flex justify-end">
+        <AutosaveStatus
+          status={autosave.status}
+          lastSavedAt={autosave.lastSavedAt}
+          errorMessage={autosave.errorMessage}
+        />
+      </div>
       <div className="space-y-2">
         <Label htmlFor="about">About You *</Label>
         <Textarea
           id="about"
           value={formData.about}
-          onChange={(e) => handleInputChange('about', e.target.value)}
+          onChange={(e) => {
+            handleInputChange('about', e.target.value);
+            autosave.saveField('about', e.target.value);
+          }}
+          onBlur={() => { void autosave.flush(); }}
           placeholder="Tell HeartPath how you show up in a healthy relationship."
           className="min-h-[120px]"
         />
@@ -854,7 +953,13 @@ const Onboarding = () => {
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label>Relationship Intent *</Label>
-          <Select value={formData.relationship_intent} onValueChange={(value) => handleInputChange('relationship_intent', value)}>
+          <Select
+            value={formData.relationship_intent}
+            onValueChange={(value) => {
+              handleInputChange('relationship_intent', value);
+              void autosave.saveFieldNow('relationship_intent', value);
+            }}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Choose your intent" />
             </SelectTrigger>
@@ -869,7 +974,13 @@ const Onboarding = () => {
         </div>
         <div className="space-y-2">
           <Label>Preferred Chat Frequency *</Label>
-          <Select value={formData.preferred_chat_frequency} onValueChange={(value) => handleInputChange('preferred_chat_frequency', value)}>
+          <Select
+            value={formData.preferred_chat_frequency}
+            onValueChange={(value) => {
+              handleInputChange('preferred_chat_frequency', value);
+              void autosave.saveFieldNow('preferred_chat_frequency', value);
+            }}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Choose a rhythm" />
             </SelectTrigger>
@@ -885,7 +996,13 @@ const Onboarding = () => {
       </div>
       <div className="space-y-2">
         <Label>Communication Style *</Label>
-        <Select value={formData.communication_style} onValueChange={(value) => handleInputChange('communication_style', value)}>
+        <Select
+          value={formData.communication_style}
+          onValueChange={(value) => {
+            handleInputChange('communication_style', value);
+            void autosave.saveFieldNow('communication_style', value);
+          }}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Choose your communication style" />
           </SelectTrigger>
@@ -964,7 +1081,7 @@ const Onboarding = () => {
         <label className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300">
           <Checkbox
             checked={formData.heartpath_norms_acknowledged}
-            onCheckedChange={(checked) => handleInputChange('heartpath_norms_acknowledged', Boolean(checked))}
+            onCheckedChange={(checked) => ackNorms(Boolean(checked))}
           />
           <span>I agree to use HeartPath respectfully and build connection through mutual trust and pace.</span>
         </label>
@@ -974,10 +1091,23 @@ const Onboarding = () => {
 
   const renderBoundariesStep = () => (
     <div className="space-y-5">
+      <div className="flex justify-end">
+        <AutosaveStatus
+          status={autosave.status}
+          lastSavedAt={autosave.lastSavedAt}
+          errorMessage={autosave.errorMessage}
+        />
+      </div>
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label>Voice Notes Comfort *</Label>
-          <Select value={formData.voice_notes_comfort} onValueChange={(value) => handleInputChange('voice_notes_comfort', value)}>
+          <Select
+            value={formData.voice_notes_comfort}
+            onValueChange={(value) => {
+              handleInputChange('voice_notes_comfort', value);
+              void autosave.saveFieldNow('voice_notes_comfort', value);
+            }}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Choose comfort level" />
             </SelectTrigger>
@@ -992,7 +1122,13 @@ const Onboarding = () => {
         </div>
         <div className="space-y-2">
           <Label>Pace Style *</Label>
-          <Select value={formData.pace_style} onValueChange={(value) => handleInputChange('pace_style', value)}>
+          <Select
+            value={formData.pace_style}
+            onValueChange={(value) => {
+              handleInputChange('pace_style', value);
+              void autosave.saveFieldNow('pace_style', value);
+            }}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Choose a pace" />
             </SelectTrigger>
@@ -1007,7 +1143,13 @@ const Onboarding = () => {
         </div>
         <div className="space-y-2">
           <Label>Privacy Comfort *</Label>
-          <Select value={formData.privacy_comfort} onValueChange={(value) => handleInputChange('privacy_comfort', value)}>
+          <Select
+            value={formData.privacy_comfort}
+            onValueChange={(value) => {
+              handleInputChange('privacy_comfort', value);
+              void autosave.saveFieldNow('privacy_comfort', value);
+            }}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Choose comfort level" />
             </SelectTrigger>
@@ -1061,7 +1203,7 @@ const Onboarding = () => {
             <button
               key={item}
               type="button"
-              onClick={() => handleInputChange('deal_breakers', formData.deal_breakers.filter((value) => value !== item))}
+              onClick={() => removeFromArray('deal_breakers', item)}
               className="rounded-full bg-romantic-light-pink px-3 py-1 text-sm text-romantic-red"
             >
               {item} ×
