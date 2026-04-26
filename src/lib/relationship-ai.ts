@@ -1,3 +1,15 @@
+/**
+ * DETERMINISTIC FALLBACK summarizer.
+ *
+ * The primary path is the generate-ai-summary edge function (see
+ * src/hooks/useGenerateSummary). These template functions remain for:
+ *   - Dev environments without GROQ_API_KEY configured
+ *   - Offline / LLM-down emergency rendering
+ *   - Visual diff during prompt iteration
+ *
+ * They are NOT shown by default; the Interactive page only surfaces them
+ * after a failed LLM call.
+ */
 import { getStageName } from '@/lib/heartpath';
 
 interface RelationshipSummaryInput {
