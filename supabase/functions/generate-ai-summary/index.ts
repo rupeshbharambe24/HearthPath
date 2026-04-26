@@ -342,15 +342,26 @@ async function computeInputHash(
   memories: CollectedMemory[],
   checkins: CollectedCheckin[]
 ): Promise<string> {
-  const memoryIds = memories.map((m) => m.id).sort();
+  // Hash includes the actual content fields the LLM will see, not just ids,
+  // so editing a memory's memo_text or a check-in's note correctly invalidates
+  // the cache (memos and check-in notes are mutable in the current schema).
+  const memoryKeys = memories
+    .map(
+      (m) =>
+        `${m.id}|${m.entry_type}|${m.mood ?? ''}|${m.memo_text ?? ''}`
+    )
+    .sort();
   const checkinKeys = checkins
-    .map((c) => `${c.week_start}:${c.rating}`)
+    .map(
+      (c) =>
+        `${c.week_start}|${c.rating}|${c.note ?? ''}|${c.gratitude ?? ''}`
+    )
     .sort();
   const seed = JSON.stringify({
     kind: body.kind,
     scope: body.source_scope,
     query: body.kind === 'memory_search' ? body.query : null,
-    memory_ids: memoryIds,
+    memory_keys: memoryKeys,
     checkin_keys: checkinKeys,
   });
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed));
