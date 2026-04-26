@@ -1029,6 +1029,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_user_access_state: {
+        Args: {
+          p_user: string
+          p_state: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
