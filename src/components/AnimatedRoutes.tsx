@@ -14,6 +14,7 @@ const Settings = lazy(() => import('../pages/Settings'));
 const MyProfile = lazy(() => import('../pages/MyProfile'));
 const Interactive = lazy(() => import('../pages/Interactive'));
 const AdminVerifications = lazy(() => import('../pages/AdminVerifications'));
+const AdminModeration = lazy(() => import('../pages/AdminModeration'));
 
 const pageTransition = {
   initial: { opacity: 0, y: 8 },
@@ -98,6 +99,14 @@ const AnimatedRoutes = () => {
               element={
                 <ProtectedRoute>
                   <AdminVerifications />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/moderation"
+              element={
+                <ProtectedRoute>
+                  <AdminModeration />
                 </ProtectedRoute>
               }
             />

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Heart, MessageSquare, Search, User, Settings, LogOut, LayoutDashboard, Zap, ShieldCheck, Sun, Moon } from 'lucide-react';
+import { Heart, MessageSquare, Search, User, Settings, LogOut, LayoutDashboard, Zap, ShieldCheck, ShieldAlert, Sun, Moon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -30,7 +30,10 @@ const Sidebar = () => {
     { name: 'My Profile', href: '/profile', icon: User },
     { name: 'Interactive', href: '/interactive', icon: Zap },
     { name: 'Settings', href: '/settings', icon: Settings },
-    ...(isAdmin ? [{ name: 'Verifications', href: '/admin/verifications', icon: ShieldCheck }] : []),
+    ...(isAdmin ? [
+      { name: 'Verifications', href: '/admin/verifications', icon: ShieldCheck },
+      { name: 'Moderation', href: '/admin/moderation', icon: ShieldAlert },
+    ] : []),
   ];
 
   return (
