@@ -2,7 +2,7 @@
 
 A trust-first college dating platform built on **verified identity, intentional pacing, and revocable consent at every layer**. HeartPath replaces swipe culture with a curated daily discovery feed and a six-stage progression model in which every intimacy unlock — a closer photo, a voice note, an exclusive bond — must be explicitly granted by both partners and can be revoked at any time.
 
-> Status: Phase 1 (security & data integrity hardening) is in review on PR [#1](https://github.com/rupeshbharambe24/heart-surface-connect/pull/1). The README below describes the intended post-Phase-1 architecture; some triggers and edge functions referenced here only exist on the `phase1/security-hardening` branch until that PR lands.
+> Status: Phase 1 (security & data integrity hardening) is in review on PR [#1](https://github.com/rupeshbharambe24/HearthPath/pull/1). The README below describes the intended post-Phase-1 architecture; some triggers and edge functions referenced here only exist on the `phase1/security-hardening` branch until that PR lands.
 
 ---
 
@@ -100,7 +100,7 @@ Admins review pending submissions through `/admin/verifications`. Admin role is 
 ## Project structure
 
 ```
-heart-surface-connect/
+HearthPath/
 ├── src/
 │   ├── pages/                # Route components (Index, Onboarding, Dashboard, Explore, Chat, Interactive, MyProfile, Settings, AdminVerifications, NotFound)
 │   ├── components/           # Layouts, profile cards, photo manager, chat UI, memory trail, etc.
@@ -129,8 +129,8 @@ heart-surface-connect/
 ### One-time setup
 
 ```bash
-git clone https://github.com/rupeshbharambe24/heart-surface-connect.git
-cd heart-surface-connect
+git clone https://github.com/rupeshbharambe24/HearthPath.git
+cd HearthPath
 npm install
 cp .env.example .env.local
 ```
@@ -258,7 +258,7 @@ The Interactive page is the heart of the post-match experience. It exposes:
 
 **Phase 1 — Security and data integrity hardening** (in review)
 
-12 task blocks closing the audit findings. RLS, triggers, and edge-function validation move authoritative checks into the database. Photos are private with stage-aware signed URLs. Admin role is server-side only. See PR [#1](https://github.com/rupeshbharambe24/heart-surface-connect/pull/1).
+12 task blocks closing the audit findings. RLS, triggers, and edge-function validation move authoritative checks into the database. Photos are private with stage-aware signed URLs. Admin role is server-side only. See PR [#1](https://github.com/rupeshbharambe24/HearthPath/pull/1).
 
 **Phase 2 — "Feature is real, not stub"** (planned)
 
