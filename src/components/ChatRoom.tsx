@@ -16,6 +16,8 @@ import { useToast } from '@/hooks/use-toast';
 import { getLevelGlow } from '@/lib/animations';
 import { messageSchema } from '@/lib/schemas';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
+import { usePresence } from '@/hooks/usePresence';
+import PresenceDot from './PresenceDot';
 
 interface ChatRoomProps {
   partnerId: string;
@@ -35,6 +37,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
   const messages = getMessagesWithPartner(partnerId);
   const partnerUnread = unreadFromPartner(partnerId);
   const { partnerTyping, emitTyping } = useTypingIndicator(user?.id, partnerId);
+  const partnerOnline = usePresence(partnerId);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -129,7 +132,13 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
             transition={{ duration: 0.3 }}
           >
             <CardTitle className="text-xl font-semibold text-gray-800 dark:text-gray-200">
-              {matchName}
+              <div className="flex items-center gap-2">
+                <PresenceDot online={partnerOnline} />
+                <span>{matchName}</span>
+                <span className="text-xs text-muted-foreground">
+                  {partnerOnline ? 'Online' : 'Offline'}
+                </span>
+              </div>
             </CardTitle>
             <RelationshipBadge level={relationshipLevel} />
           </motion.div>

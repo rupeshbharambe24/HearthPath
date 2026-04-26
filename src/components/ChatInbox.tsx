@@ -3,6 +3,8 @@ import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
+import { usePresence } from '@/hooks/usePresence';
+import PresenceDot from './PresenceDot';
 
 interface ChatPreview {
   partnerId: string;
@@ -19,17 +21,74 @@ interface ChatInboxProps {
   onSelectChat: (partnerId: string) => void;
 }
 
-const ChatInbox: React.FC<ChatInboxProps> = ({ 
-  chatPreviews, 
-  loading, 
-  selectedPartnerId, 
-  onSelectChat 
+interface ChatInboxRowProps {
+  chat: ChatPreview;
+  selected: boolean;
+  onSelect: (partnerId: string) => void;
+  formatTime: (timestamp: string) => string;
+}
+
+const ChatInboxRow: React.FC<ChatInboxRowProps> = ({ chat, selected, onSelect, formatTime }) => {
+  const isOnline = usePresence(chat.partnerId);
+
+  return (
+    <Card
+      className={cn(
+        "m-2 p-3 cursor-pointer transition-colors border-l-4 hover:bg-gray-50 dark:hover:bg-gray-800",
+        selected
+          ? "bg-romantic-light-pink dark:bg-romantic-red/20 border-l-romantic-red"
+          : "border-l-transparent"
+      )}
+      onClick={() => onSelect(chat.partnerId)}
+    >
+      <div className="flex items-center space-x-3">
+        <Avatar className="w-12 h-12">
+          <AvatarFallback className="bg-romantic-red text-white font-semibold">
+            {chat.partnerName.charAt(0).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <PresenceDot online={isOnline} />
+              <h4 className="font-medium text-gray-900 dark:text-white truncate">
+                {chat.partnerName}
+              </h4>
+            </div>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {formatTime(chat.lastMessageTime)}
+            </span>
+          </div>
+
+          <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+            {chat.lastMessage || 'No messages yet'}
+          </p>
+
+          {chat.unreadCount > 0 && (
+            <div className="mt-1">
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-romantic-red text-white">
+                {chat.unreadCount}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+const ChatInbox: React.FC<ChatInboxProps> = ({
+  chatPreviews,
+  loading,
+  selectedPartnerId,
+  onSelectChat
 }) => {
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-    
+
     if (diffInHours < 24) {
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } else {
@@ -76,47 +135,13 @@ const ChatInbox: React.FC<ChatInboxProps> = ({
   return (
     <div className="overflow-y-auto h-full">
       {chatPreviews.map((chat) => (
-        <Card
+        <ChatInboxRow
           key={chat.partnerId}
-          className={cn(
-            "m-2 p-3 cursor-pointer transition-colors border-l-4 hover:bg-gray-50 dark:hover:bg-gray-800",
-            selectedPartnerId === chat.partnerId
-              ? "bg-romantic-light-pink dark:bg-romantic-red/20 border-l-romantic-red"
-              : "border-l-transparent"
-          )}
-          onClick={() => onSelectChat(chat.partnerId)}
-        >
-          <div className="flex items-center space-x-3">
-            <Avatar className="w-12 h-12">
-              <AvatarFallback className="bg-romantic-red text-white font-semibold">
-                {chat.partnerName.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
-                <h4 className="font-medium text-gray-900 dark:text-white truncate">
-                  {chat.partnerName}
-                </h4>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {formatTime(chat.lastMessageTime)}
-                </span>
-              </div>
-              
-              <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                {chat.lastMessage || 'No messages yet'}
-              </p>
-              
-              {chat.unreadCount > 0 && (
-                <div className="mt-1">
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-romantic-red text-white">
-                    {chat.unreadCount}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        </Card>
+          chat={chat}
+          selected={selectedPartnerId === chat.partnerId}
+          onSelect={onSelectChat}
+          formatTime={formatTime}
+        />
       ))}
     </div>
   );
