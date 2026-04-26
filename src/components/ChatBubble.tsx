@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Check, CheckCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { bubbleVariants } from '@/lib/animations';
+import { useSignedVoiceMessage } from '@/hooks/useSignedVoiceMessage';
 
 interface ChatBubbleProps {
   message: string;
@@ -10,6 +11,8 @@ interface ChatBubbleProps {
   timestamp: string;
   senderName?: string;
   readAt?: string | null;
+  contentType?: string;
+  messageId?: string;
 }
 
 const ChatBubble: React.FC<ChatBubbleProps> = ({
@@ -18,7 +21,11 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({
   timestamp,
   senderName,
   readAt,
+  contentType = 'text',
+  messageId,
 }) => {
+  const isVoice = contentType === 'voice';
+
   return (
     <motion.div
       className={cn(
@@ -44,7 +51,11 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({
             {senderName}
           </p>
         )}
-        <p className="text-sm leading-relaxed">{message}</p>
+        {isVoice && messageId ? (
+          <VoiceContent messageId={messageId} isOwn={isOwn} />
+        ) : (
+          <p className="text-sm leading-relaxed">{message}</p>
+        )}
         <div className={cn(
           "flex items-center gap-1 mt-1",
           isOwn ? "justify-end" : "justify-start"
@@ -73,5 +84,30 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({
     </motion.div>
   );
 };
+
+function VoiceContent({ messageId, isOwn }: { messageId: string; isOwn: boolean }) {
+  const { data, isLoading, error } = useSignedVoiceMessage(messageId, true);
+  if (isLoading) {
+    return <div className="h-8 w-40 bg-muted/40 rounded animate-pulse" />;
+  }
+  if (error || !data) {
+    return (
+      <div className={cn(
+        "text-xs italic",
+        isOwn ? "text-white/70" : "text-gray-500 dark:text-gray-400"
+      )}>
+        (voice note unavailable)
+      </div>
+    );
+  }
+  return (
+    <audio
+      controls
+      src={data.url}
+      className="max-w-xs w-full"
+      preload="metadata"
+    />
+  );
+}
 
 export default ChatBubble;

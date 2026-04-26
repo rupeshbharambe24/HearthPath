@@ -1,13 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Send } from 'lucide-react';
+import { Send, Mic } from 'lucide-react';
 import ChatBubble from './ChatBubble';
 import MemoryTrail from './MemoryTrail';
 import RelationshipBadge from './RelationshipBadge';
+import VoiceRecorder from './VoiceRecorder';
 import { cn } from '@/lib/utils';
 import { useMessages } from '@/hooks/useMessages';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,6 +30,7 @@ interface ChatRoomProps {
 const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipLevel }) => {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [voiceUploading, setVoiceUploading] = useState(false);
   const { user } = useAuth();
   const { getMessagesWithPartner, unreadFromPartner, markThreadRead } = useMessages();
   const { toast } = useToast();
@@ -38,6 +41,49 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
   const partnerUnread = unreadFromPartner(partnerId);
   const { partnerTyping, emitTyping } = useTypingIndicator(user?.id, partnerId);
   const partnerOnline = usePresence(partnerId);
+
+  // Fetch the relationship between the current user and the selected partner so we
+  // can derive the actual current_stage and look up granted permissions for voice.
+  const { data: relationshipRow } = useQuery({
+    queryKey: ['chat-room-relationship', user?.id, partnerId],
+    enabled: Boolean(user?.id && partnerId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('relationships')
+        .select('id, current_stage, current_level, user_a, user_b')
+        .or(
+          `and(user_a.eq.${user!.id},user_b.eq.${partnerId}),and(user_a.eq.${partnerId},user_b.eq.${user!.id})`
+        )
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const relationshipId = relationshipRow?.id ?? null;
+
+  const { data: voicePermissions } = useQuery({
+    queryKey: ['chat-room-voice-permissions', relationshipId],
+    enabled: Boolean(relationshipId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('relationship_permissions')
+        .select('permission, granted_to, granted_by, revoked_at')
+        .eq('relationship_id', relationshipId!)
+        .eq('permission', 'voice_notes');
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const stage = relationshipRow?.current_stage ?? relationshipRow?.current_level ?? relationshipLevel ?? 1;
+  const hasVoiceGrant = (voicePermissions ?? []).some(
+    (p) =>
+      p.permission === 'voice_notes' &&
+      p.granted_to === user?.id &&
+      p.revoked_at === null
+  );
+  const canSendVoice = stage >= 3 && hasVoiceGrant;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -106,6 +152,33 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
       console.error('Error in handleSendMessage:', error);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleSendVoice = async (blob: Blob, mimeType: string, _durationMs: number) => {
+    if (!partnerId) return;
+    setVoiceUploading(true);
+    try {
+      const ext =
+        mimeType === 'audio/webm' ? 'webm' :
+        mimeType === 'audio/mp4' ? 'm4a' :
+        mimeType === 'audio/mpeg' ? 'mp3' :
+        mimeType === 'audio/wav' ? 'wav' : 'ogg';
+      const file = new File([blob], `voice.${ext}`, { type: mimeType });
+      const fd = new FormData();
+      fd.append('receiver_id', partnerId);
+      fd.append('file', file);
+      const { error } = await supabase.functions.invoke('upload-voice-message', { body: fd });
+      if (error) throw error;
+      // Realtime messages subscription will surface the new row.
+    } catch (err) {
+      toast({
+        title: 'Voice note failed',
+        description: err instanceof Error ? err.message : 'Try again',
+        variant: 'destructive',
+      });
+    } finally {
+      setVoiceUploading(false);
     }
   };
 
@@ -184,7 +257,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
                     messages.map((msg) => (
                       <ChatBubble
                         key={msg.id}
+                        messageId={msg.id}
                         message={msg.content || ''}
+                        contentType={msg.content_type}
                         isOwn={msg.sender_id === user?.id}
                         timestamp={new Date(msg.created_at).toLocaleTimeString([], {
                           hour: '2-digit',
@@ -211,7 +286,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
                     {matchName} is typing…
                   </div>
                 )}
-                <div className="flex space-x-2">
+                <div className="flex items-center space-x-2">
                   <Input
                     placeholder="Type your message..."
                     value={message}
@@ -223,6 +298,19 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
                     className="flex-1 transition-shadow duration-200 focus:shadow-md focus:shadow-romantic-red/10"
                     disabled={sending}
                   />
+                  {canSendVoice ? (
+                    <VoiceRecorder onSend={handleSendVoice} isSending={voiceUploading} />
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled
+                      title="Voice notes require stage 3 and your partner's permission"
+                      aria-label="Voice notes require stage 3 and your partner's permission"
+                    >
+                      <Mic className="h-4 w-4" />
+                    </Button>
+                  )}
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                     <Button
                       onClick={handleSendMessage}
