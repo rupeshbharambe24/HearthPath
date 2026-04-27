@@ -177,3 +177,75 @@ export const floatAnimation: Variants = {
     },
   },
 };
+
+// --- Phase 3 Plan A additions ---
+
+/** A bouncy spring for celebratory moments (stage advance, milestone). */
+export const celebrateSpring: Transition = {
+  type: 'spring',
+  stiffness: 260,
+  damping: 18,
+  mass: 0.9,
+};
+
+/** Slow ambient pulse for "live" indicators (online dot, awaiting partner). */
+export const pulseSlow: Variants = {
+  initial: { opacity: 0.6, scale: 1 },
+  animate: {
+    opacity: [0.6, 1, 0.6],
+    scale: [1, 1.06, 1],
+    transition: {
+      duration: 2.4,
+      repeat: Infinity,
+      ease: 'easeInOut',
+    },
+  },
+};
+
+/** Glowing halo behind a featured element (used during celebration). */
+export const haloGlow: Variants = {
+  initial: { opacity: 0, scale: 0.8 },
+  animate: {
+    opacity: [0, 0.65, 0.45, 0.65, 0],
+    scale: [0.8, 1.4, 1.6, 1.4, 1.8],
+    transition: {
+      duration: 2.2,
+      ease: 'easeInOut',
+      times: [0, 0.2, 0.5, 0.8, 1],
+    },
+  },
+};
+
+/** Stage badge graduation: scale up + tilt + settle. */
+export const stageGraduate: Variants = {
+  initial: { scale: 0.7, rotate: -8, opacity: 0 },
+  animate: {
+    scale: [0.7, 1.18, 1],
+    rotate: [-8, 4, 0],
+    opacity: [0, 1, 1],
+    transition: {
+      duration: 0.9,
+      ease: [0.34, 1.56, 0.64, 1],
+      times: [0, 0.6, 1],
+    },
+  },
+};
+
+/** Soft rise for affirming microcopy under the celebration card. */
+export const microCopyRise: Variants = {
+  initial: { y: 12, opacity: 0 },
+  animate: {
+    y: 0,
+    opacity: 1,
+    transition: { delay: 0.45, duration: 0.5, ease: [0.16, 1, 0.3, 1] },
+  },
+};
+
+/** Gentle attention ping — used on cooldown countdown when freshly set. */
+export const attentionPing: Variants = {
+  initial: { scale: 1 },
+  animate: {
+    scale: [1, 1.08, 1],
+    transition: { duration: 0.6, ease: 'easeOut' },
+  },
+};

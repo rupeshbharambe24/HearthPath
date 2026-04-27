@@ -11,12 +11,15 @@ import {
 } from '@/components/ui/dialog';
 import { Heart, PauseCircle, PlayCircle, Users } from 'lucide-react';
 import CooldownTimer from '@/components/CooldownTimer';
+import BreakupReflectionModal from '@/components/BreakupReflectionModal';
 import { toast } from 'sonner';
 import { getStageName } from '@/lib/heartpath';
 import { useRelationshipSpaceData } from '@/hooks/useRelationshipSpaceData';
 
 const BreakupPanel: React.FC = () => {
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
+  const [reflectOpen, setReflectOpen] = useState(false);
+  const [reflectRelationshipId, setReflectRelationshipId] = useState<string | null>(null);
   const { loading, primaryRelationship, partner, currentStage, isPaused, setPausedState, archiveRelationship } =
     useRelationshipSpaceData();
 
@@ -30,10 +33,15 @@ const BreakupPanel: React.FC = () => {
   };
 
   const handleArchive = async () => {
+    const archivedId = primaryRelationship?.id ?? null;
     const result = await archiveRelationship();
     if (result.success) {
       toast.success('Relationship archived. A seven-day cooldown has started.');
       setShowArchiveDialog(false);
+      if (archivedId) {
+        setReflectRelationshipId(archivedId);
+        setReflectOpen(true);
+      }
     } else {
       toast.error(result.error);
     }
@@ -74,6 +82,12 @@ const BreakupPanel: React.FC = () => {
         </div>
 
         <CooldownTimer startTime={new Date(primaryRelationship.cooldown_until)} />
+
+        <BreakupReflectionModal
+          open={reflectOpen}
+          onClose={() => setReflectOpen(false)}
+          relationshipId={reflectRelationshipId}
+        />
       </div>
     );
   }
@@ -145,6 +159,12 @@ const BreakupPanel: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BreakupReflectionModal
+        open={reflectOpen}
+        onClose={() => setReflectOpen(false)}
+        relationshipId={reflectRelationshipId}
+      />
     </div>
   );
 };
