@@ -316,6 +316,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ partnerId, matchName, relationshipL
                       onClick={handleSendMessage}
                       className="romantic-btn"
                       disabled={!message.trim() || sending}
+                      aria-label="Send message"
                     >
                       <Send className="w-4 h-4" />
                     </Button>

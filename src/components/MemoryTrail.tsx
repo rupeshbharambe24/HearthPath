@@ -1,4 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,10 +12,30 @@ import { Heart, Paperclip, Plus, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import type { Tables } from '@/integrations/supabase/types';
 import { getStageName } from '@/lib/heartpath';
 import { memorySchema } from '@/lib/schemas';
 import MemoryAttachment from '@/components/MemoryAttachment';
+
+type MemoryFilter =
+  | 'all'
+  | 'milestone'
+  | 'good_moment'
+  | 'hard_moment'
+  | 'repair'
+  | 'gratitude'
+  | 'reflection';
+
+const FILTER_LABELS: { key: MemoryFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'milestone', label: 'Milestones' },
+  { key: 'good_moment', label: 'Good moments' },
+  { key: 'hard_moment', label: 'Hard moments' },
+  { key: 'repair', label: 'Repairs' },
+  { key: 'gratitude', label: 'Gratitude' },
+  { key: 'reflection', label: 'Reflections' },
+];
 
 type MemoryEntry = Tables<'memories'>;
 
@@ -85,8 +107,44 @@ const MemoryTrail: React.FC<MemoryTrailProps> = ({
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [filter, setFilter] = useState<MemoryFilter>('all');
+  const reduced = useReducedMotion();
   const { user } = useAuth();
   const { toast } = useToast();
+
+  const counts = useMemo(() => {
+    const c: Record<MemoryFilter, number> = {
+      all: memories.length,
+      milestone: 0,
+      good_moment: 0,
+      hard_moment: 0,
+      repair: 0,
+      gratitude: 0,
+      reflection: 0,
+    };
+    for (const m of memories) {
+      if (m.entry_type && (m.entry_type as MemoryFilter) in c && m.entry_type !== 'all') {
+        c[m.entry_type as MemoryFilter]++;
+      }
+    }
+    return c;
+  }, [memories]);
+
+  const filtered = useMemo(
+    () => (filter === 'all' ? memories : memories.filter((m) => m.entry_type === filter)),
+    [memories, filter]
+  );
+
+  const groups = useMemo(() => {
+    const map = new Map<string, MemoryEntry[]>();
+    for (const m of filtered) {
+      if (!m.created_at) continue;
+      const key = new Date(m.created_at).toISOString().slice(0, 7);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(m);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a));
+  }, [filtered]);
 
   useEffect(() => {
     setResolvedRelationshipId(relationshipId || null);
@@ -534,79 +592,123 @@ const MemoryTrail: React.FC<MemoryTrailProps> = ({
       </CardHeader>
 
       <CardContent className="pt-0">
+        {/* Filter chips */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {FILTER_LABELS.map((f) => {
+            const active = filter === f.key;
+            const count = counts[f.key];
+            return (
+              <Button
+                key={f.key}
+                size="sm"
+                variant={active ? 'default' : 'outline'}
+                onClick={() => setFilter(f.key)}
+                className="rounded-full"
+                aria-pressed={active}
+              >
+                {f.label}
+                <span className="ml-1.5 text-xs opacity-70">{count}</span>
+              </Button>
+            );
+          })}
+        </div>
+
         <div className="relative">
           <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-romantic-red via-romantic-pink to-romantic-rose opacity-30" />
 
-          {memories.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="w-16 h-16 mx-auto mb-4 bg-romantic-light-pink dark:bg-romantic-red/20 rounded-full flex items-center justify-center">
-                <span className="text-2xl">💗</span>
-              </div>
-              <p className="text-gray-500 dark:text-gray-400 text-sm">
-                No moments saved yet. Start capturing your HeartPath as it unfolds.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-6 max-h-96 overflow-y-auto">
-              {memories.map((memory, index) => (
-                <div key={memory.id} className="relative flex items-start space-x-4 animate-fade-in">
-                  <div className="relative z-10 flex-shrink-0">
-                    <div className="w-12 h-12 bg-gradient-to-br from-romantic-red to-romantic-pink rounded-full flex items-center justify-center shadow-lg text-white font-semibold">
-                      {index + 1}
-                    </div>
-                  </div>
+          <div className="max-h-96 overflow-y-auto pr-1">
+            <AnimatePresence mode="popLayout">
+              {groups.length === 0 && (
+                <motion.div
+                  key="empty"
+                  initial={reduced ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="text-sm text-muted-foreground italic py-6 text-center"
+                >
+                  {memories.length === 0
+                    ? 'No moments saved yet. Start capturing your HeartPath as it unfolds.'
+                    : 'No memories in this view yet.'}
+                </motion.div>
+              )}
+              {groups.map(([monthKey, monthMemories]) => (
+                <motion.section
+                  key={monthKey}
+                  layout={!reduced}
+                  initial={reduced ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="mb-6"
+                >
+                  <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
+                    {format(new Date(`${monthKey}-01T00:00:00Z`), 'MMMM yyyy')}
+                  </h3>
+                  <div className="space-y-3">
+                    {monthMemories.map((memory) => {
+                      const overallIndex = filtered.findIndex((entry) => entry.id === memory.id);
+                      return (
+                        <div key={memory.id} className="relative flex items-start space-x-4 animate-fade-in">
+                          <div className="relative z-10 flex-shrink-0">
+                            <div className="w-12 h-12 bg-gradient-to-br from-romantic-red to-romantic-pink rounded-full flex items-center justify-center shadow-lg text-white font-semibold">
+                              {overallIndex + 1}
+                            </div>
+                          </div>
 
-                  <div
-                    className={`flex-1 p-4 rounded-2xl shadow-sm border border-white/50 dark:border-gray-700/50 ${getMemoryCardColor(memory.entry_type)}`}
-                  >
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      <Badge variant="secondary">{memory.entry_type?.replaceAll('_', ' ') || 'memory'}</Badge>
-                      <Badge variant={memory.visibility === 'shared' ? 'default' : 'outline'}>
-                        {memory.visibility === 'shared' ? 'Shared vault' : 'Private'}
-                      </Badge>
-                      {memory.mood ? <Badge variant="outline">{memory.mood}</Badge> : null}
-                    </div>
-
-                    <p className="text-sm text-gray-700 dark:text-gray-200 mb-2">{memory.memo_text}</p>
-
-                    {memory.attachment_url ? (
-                      <div className="mb-2">
-                        <MemoryAttachment
-                          memoryId={memory.id}
-                          attachmentUrl={memory.attachment_url}
-                          attachmentType={memory.attachment_type as 'image' | 'audio' | 'pdf' | null}
-                        />
-                      </div>
-                    ) : null}
-
-                    {memory.reflection_follow_up ? (
-                      <p className="text-xs text-gray-600 dark:text-gray-300 mb-2">
-                        <span className="font-medium">Follow-up:</span> {memory.reflection_follow_up}
-                      </p>
-                    ) : null}
-
-                    {memory.tags?.length ? (
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {memory.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="px-2 py-1 bg-white/60 dark:bg-gray-800/70 rounded-full text-xs text-gray-600 dark:text-gray-300"
+                          <div
+                            className={`flex-1 p-4 rounded-2xl shadow-sm border border-white/50 dark:border-gray-700/50 ${getMemoryCardColor(memory.entry_type)}`}
                           >
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              <Badge variant="secondary">{memory.entry_type?.replaceAll('_', ' ') || 'memory'}</Badge>
+                              <Badge variant={memory.visibility === 'shared' ? 'default' : 'outline'}>
+                                {memory.visibility === 'shared' ? 'Shared vault' : 'Private'}
+                              </Badge>
+                              {memory.mood ? <Badge variant="outline">{memory.mood}</Badge> : null}
+                            </div>
 
-                    <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                      <span>{formatDate(memory.created_at)}</span>
-                      <span>Stage {memory.level_at || relationshipLevel}</span>
-                    </div>
+                            <p className="text-sm text-gray-700 dark:text-gray-200 mb-2">{memory.memo_text}</p>
+
+                            {memory.attachment_url ? (
+                              <div className="mb-2">
+                                <MemoryAttachment
+                                  memoryId={memory.id}
+                                  attachmentUrl={memory.attachment_url}
+                                  attachmentType={memory.attachment_type as 'image' | 'audio' | 'pdf' | null}
+                                />
+                              </div>
+                            ) : null}
+
+                            {memory.reflection_follow_up ? (
+                              <p className="text-xs text-gray-600 dark:text-gray-300 mb-2">
+                                <span className="font-medium">Follow-up:</span> {memory.reflection_follow_up}
+                              </p>
+                            ) : null}
+
+                            {memory.tags?.length ? (
+                              <div className="flex flex-wrap gap-2 mb-3">
+                                {memory.tags.map((tag) => (
+                                  <span
+                                    key={tag}
+                                    className="px-2 py-1 bg-white/60 dark:bg-gray-800/70 rounded-full text-xs text-gray-600 dark:text-gray-300"
+                                  >
+                                    #{tag}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                              <span>{formatDate(memory.created_at)}</span>
+                              <span>Stage {memory.level_at || relationshipLevel}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
+                </motion.section>
               ))}
-            </div>
-          )}
+            </AnimatePresence>
+          </div>
         </div>
       </CardContent>
     </Card>

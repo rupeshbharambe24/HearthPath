@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Heart, MessageSquare, Search, User, Settings, LogOut, LayoutDashboard, Zap, ShieldCheck, ShieldAlert, Sun, Moon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -13,6 +14,7 @@ const Sidebar = () => {
   const { logout, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { data: isAdmin } = useIsAdmin();
+  const { t } = useTranslation();
 
   const handleLogout = async () => {
     try {
@@ -24,15 +26,15 @@ const Sidebar = () => {
   };
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Explore', href: '/explore', icon: Search },
-    { name: 'Chat', href: '/chat', icon: MessageSquare },
-    { name: 'My Profile', href: '/profile', icon: User },
-    { name: 'Interactive', href: '/interactive', icon: Zap },
-    { name: 'Settings', href: '/settings', icon: Settings },
+    { name: t('nav.dashboard'), href: '/dashboard', icon: LayoutDashboard },
+    { name: t('nav.explore'), href: '/explore', icon: Search },
+    { name: t('nav.chat'), href: '/chat', icon: MessageSquare },
+    { name: t('nav.profile'), href: '/profile', icon: User },
+    { name: t('nav.interactive'), href: '/interactive', icon: Zap },
+    { name: t('nav.settings'), href: '/settings', icon: Settings },
     ...(isAdmin ? [
-      { name: 'Verifications', href: '/admin/verifications', icon: ShieldCheck },
-      { name: 'Moderation', href: '/admin/moderation', icon: ShieldAlert },
+      { name: t('nav.verifications'), href: '/admin/verifications', icon: ShieldCheck },
+      { name: t('nav.moderation'), href: '/admin/moderation', icon: ShieldAlert },
     ] : []),
   ];
 
@@ -130,7 +132,7 @@ const Sidebar = () => {
           className="flex items-center w-full px-3 py-2.5 text-sm font-medium rounded-xl text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all duration-200"
         >
           <LogOut className="w-[18px] h-[18px] mr-3" />
-          Sign Out
+          {t('nav.signOut')}
         </button>
       </div>
     </aside>
