@@ -9,6 +9,9 @@ import BlockedUserList from '@/components/BlockedUserList';
 import BreakupPanel from '@/components/BreakupPanel';
 import AccountActions from '@/components/AccountActions';
 import DiscoveryPreferencesCard from '@/components/settings/DiscoveryPreferencesCard';
+import NotificationPreferencesCard from '@/components/settings/NotificationPreferencesCard';
+import PrivacyCard from '@/components/settings/PrivacyCard';
+import DataExportCard from '@/components/settings/DataExportCard';
 
 type SettingsTab =
   | 'account'
@@ -92,36 +95,15 @@ const Settings = () => {
             </TabsContent>
 
             <TabsContent value="notifications">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Notifications</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  Coming up: notification preferences.
-                </CardContent>
-              </Card>
+              <NotificationPreferencesCard />
             </TabsContent>
 
             <TabsContent value="privacy">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Privacy</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  Coming up: privacy controls.
-                </CardContent>
-              </Card>
+              <PrivacyCard />
             </TabsContent>
 
             <TabsContent value="data">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Data</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  Coming up: data export.
-                </CardContent>
-              </Card>
+              <DataExportCard />
             </TabsContent>
 
             <TabsContent value="relationship">
