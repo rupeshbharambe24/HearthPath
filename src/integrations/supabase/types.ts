@@ -839,6 +839,7 @@ export type Database = {
           communication_style: string | null
           created_at: string | null
           deal_breakers: string[] | null
+          discoverable: boolean
           discovery_mode: string | null
           email_verified_at: string | null
           heartpath_norms_acknowledged_at: string | null
@@ -847,6 +848,7 @@ export type Database = {
           languages: string[] | null
           lifestyle_preferences: string[] | null
           name: string
+          notification_preferences: Json
           onboarding_completed_at: string | null
           onboarding_step: string | null
           pace_style: string | null
@@ -873,6 +875,7 @@ export type Database = {
           communication_style?: string | null
           created_at?: string | null
           deal_breakers?: string[] | null
+          discoverable?: boolean
           discovery_mode?: string | null
           email_verified_at?: string | null
           heartpath_norms_acknowledged_at?: string | null
@@ -881,6 +884,7 @@ export type Database = {
           languages?: string[] | null
           lifestyle_preferences?: string[] | null
           name: string
+          notification_preferences?: Json
           onboarding_completed_at?: string | null
           onboarding_step?: string | null
           pace_style?: string | null
@@ -907,6 +911,7 @@ export type Database = {
           communication_style?: string | null
           created_at?: string | null
           deal_breakers?: string[] | null
+          discoverable?: boolean
           discovery_mode?: string | null
           email_verified_at?: string | null
           heartpath_norms_acknowledged_at?: string | null
@@ -915,6 +920,7 @@ export type Database = {
           languages?: string[] | null
           lifestyle_preferences?: string[] | null
           name?: string
+          notification_preferences?: Json
           onboarding_completed_at?: string | null
           onboarding_step?: string | null
           pace_style?: string | null
