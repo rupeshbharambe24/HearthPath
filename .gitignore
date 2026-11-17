@@ -32,3 +32,6 @@ supabase/.temp/
 
 # Git worktrees
 .worktrees/
+
+# Crash dumps
+*.stackdump
